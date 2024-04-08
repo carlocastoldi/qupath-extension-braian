@@ -1,0 +1,32 @@
+package qupath.ext.braian;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.extensions.GitHubProject;
+import qupath.lib.gui.extensions.QuPathExtension;
+
+public class BraiAnExtension implements QuPathExtension, GitHubProject {
+
+    private static final Logger logger = LoggerFactory.getLogger(BraiAnExtension.class);
+
+    @Override
+    public GitHubRepo getRepository() {
+        return GitHubRepo.create("BraiAn extension", "carlocastoldi", "qupath-extension-braian");
+    }
+
+    @Override
+    public void installExtension(QuPathGUI qupath) {
+
+    }
+
+    @Override
+    public String getName() {
+        return "BraiAn extension";
+    }
+
+    @Override
+    public String getDescription() {
+        return "";
+    }
+}

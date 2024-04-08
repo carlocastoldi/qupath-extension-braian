@@ -1,0 +1,20 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    alias(libs.plugins.javafx)
+}
+
+group = "qupath.ext.braian"
+version = "1.0-SNAPSHOT"
+ext.qupathVersion = gradle.ext.qupathVersion
+
+dependencies {
+    implementation "io.github.qupath:qupath-gui-fx:$qupathVersion"
+    implementation libs.bundles.logging
+    testImplementation platform("org.junit:junit-bom:5.10.0")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
