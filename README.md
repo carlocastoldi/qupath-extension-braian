@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2024 Carlo Castoldi <carlo.castoldi@outlook.com>
+
+SPDX-License-Identifier: CC0-1.0
+-->
+
 # QuPath BraiAn extension
 
 Extends QuPath's functionalities for whole-brain data extraction. It works best if coupled with:
