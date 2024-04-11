@@ -31,6 +31,6 @@ public class BraiAnExtension implements QuPathExtension, GitHubProject {
 
     @Override
     public String getDescription() {
-        return "";
+        return "A collection of tools for whole-brain data extraction";
     }
 }
