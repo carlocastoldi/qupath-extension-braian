@@ -105,19 +105,19 @@ class BoundingBoxHierarchyTest {
         BoundingBoxHierarchy bbh = new BoundingBoxHierarchy(objects);
 
         PathObject cover = createObject(0, 0, 2, 2);
-        assertEquals(empty, bbh.getOverlappingDetection(cover));
+        assertEquals(empty, bbh.getOverlappingObject(cover));
         PathObject bottomEdge = createObject(0, 1, 2, 2);
-        assertEquals(empty, bbh.getOverlappingDetection(bottomEdge));
+        assertEquals(empty, bbh.getOverlappingObject(bottomEdge));
         PathObject leftEdge = createObject(1, 0, 2, 2);
-        assertEquals(empty, bbh.getOverlappingDetection(leftEdge));
+        assertEquals(empty, bbh.getOverlappingObject(leftEdge));
         PathObject rightEdge = createObject(-1, 0, 2, 2);
-        assertNull(bbh.getOverlappingDetection(rightEdge));
+        assertNull(bbh.getOverlappingObject(rightEdge));
         PathObject topEdge = createObject(0, -2, 2, 2);
-        assertNull(bbh.getOverlappingDetection(topEdge));
+        assertNull(bbh.getOverlappingObject(topEdge));
         PathObject emptyAreaButOverlapping = createObject(1, 1, 0, 0);
-        assertEquals(empty, bbh.getOverlappingDetection(emptyAreaButOverlapping));
+        assertEquals(empty, bbh.getOverlappingObject(emptyAreaButOverlapping));
         PathObject singlePointButOverlapping = createObject(PathAnnotationObject.class, ROIs.createPointsROI(1, 1, ImagePlane.getDefaultPlane()));
-        assertEquals(empty, bbh.getOverlappingDetection(singlePointButOverlapping));
+        assertEquals(empty, bbh.getOverlappingObject(singlePointButOverlapping));
     }
 
     @Test
@@ -132,11 +132,11 @@ class BoundingBoxHierarchyTest {
         assertEquals(1, bbh.getDepth());
         assertEquals(new HashSet<>(objects), bbh.toStream().collect(Collectors.toSet()));
         PathObject noContainsCentroid = createObject(-2, -4, 4, 2);
-        assertNull(bbh.getOverlappingDetection(noContainsCentroid));
+        assertNull(bbh.getOverlappingObject(noContainsCentroid));
         PathObject closerToLeftCentroid = createObject(-5.5, -10, 10.9, 10);
-        assertEquals(leftPO, bbh.getOverlappingDetection(closerToLeftCentroid));
+        assertEquals(leftPO, bbh.getOverlappingObject(closerToLeftCentroid));
         PathObject equidistant = createObject(-10, -10, 20, 20);
-        assertTrue(List.of(leftPO, rightPO).contains(bbh.getOverlappingDetection(equidistant)));
+        assertTrue(List.of(leftPO, rightPO).contains(bbh.getOverlappingObject(equidistant)));
     }
 
     @ParameterizedTest
@@ -151,7 +151,7 @@ class BoundingBoxHierarchyTest {
         assertEquals(depth, bbh.getDepth());
         assertEquals(new Rectangle(0, 0, n*size, n*size), bbh.getBox());
         assertEquals(new HashSet<>(objects), bbh.toStream().collect(Collectors.toSet()));
-        ROI bottomLeftCorner = bbh.getOverlappingDetection(createObject(0,0, size, size)).getROI();
+        ROI bottomLeftCorner = bbh.getOverlappingObject(createObject(0,0, size, size)).getROI();
         assertEquals(bottomLeftCorner.getCentroidX(), (double) size /2);
         assertEquals(bottomLeftCorner.getCentroidY(), (double) size /2);
     }
@@ -168,7 +168,7 @@ class BoundingBoxHierarchyTest {
         assertEquals(depth, bbh.getDepth());
         assertEquals(new Rectangle(0, 0, n*size, size), bbh.getBox());
         assertEquals(new HashSet<>(objects), bbh.toStream().collect(Collectors.toSet()));
-        ROI bottomLeftCorner = bbh.getOverlappingDetection(createObject(0,0, size, size)).getROI();
+        ROI bottomLeftCorner = bbh.getOverlappingObject(createObject(0,0, size, size)).getROI();
         assertEquals(bottomLeftCorner.getCentroidX(), (double) size /2);
         assertEquals(bottomLeftCorner.getCentroidY(), (double) size /2);
     }

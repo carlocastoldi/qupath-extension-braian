@@ -19,7 +19,7 @@ interface BoundingBox {
     Rectangle2D getBox();
     int getDepth();
     Stream<PathObject> toStream();
-    Optional<PathObject> getOverlappingDetectionIfPresent(PathObject object);
+    Optional<PathObject> getOverlappingObjectIfPresent(PathObject object);
 }
 
 class BVHNode implements BoundingBox {
@@ -42,7 +42,7 @@ class BVHNode implements BoundingBox {
     }
 
     @Override
-    public Optional<PathObject> getOverlappingDetectionIfPresent(PathObject object) {
+    public Optional<PathObject> getOverlappingObjectIfPresent(PathObject object) {
         // if ROI.contains() results in being buggy, in the future we could rely on:
         // ROI.getGeometry().covers(c) || ROI.getGeometry().intersects(c)
         ROI roiObject = object.getROI();
@@ -111,13 +111,13 @@ public class BoundingBoxHierarchy implements BoundingBox {
             throw new IllegalArgumentException("BoundingBoxHierarchy cannot store zero objects");
         if (objects.stream().anyMatch(o -> {ROI roi = o.getROI(); return roi.isPoint() && roi.getNumPoints() > 1;}))
             throw new IllegalArgumentException("BoundingBoxHierarchy cannot handle PointsROI objects with multiple points");
-        double minX = objects.stream().map(detection -> detection.getROI().getBoundsX()).min(Double::compare).get();
-        double minY = objects.stream().map(detection -> detection.getROI().getBoundsY()).min(Double::compare).get();
-        double maxX = objects.stream().map(detection -> detection.getROI().getBoundsX() + detection.getROI().getBoundsWidth()).max(Double::compare).get();
-        double maxY = objects.stream().map(detection -> detection.getROI().getBoundsY() + detection.getROI().getBoundsHeight()).max(Double::compare).get();
+        double minX = objects.stream().map(object -> object.getROI().getBoundsX()).min(Double::compare).get();
+        double minY = objects.stream().map(object -> object.getROI().getBoundsY()).min(Double::compare).get();
+        double maxX = objects.stream().map(object -> object.getROI().getBoundsX() + object.getROI().getBoundsWidth()).max(Double::compare).get();
+        double maxY = objects.stream().map(object -> object.getROI().getBoundsY() + object.getROI().getBoundsHeight()).max(Double::compare).get();
         this.bbox = new Rectangle2D.Double(minX, minY, maxX - minX, maxY - minY);
         if (maxDepth == 1 || this.bbox.isEmpty())
-            this.children = objects.stream().map(detection -> (BoundingBox) new BVHNode(detection)).toList();
+            this.children = objects.stream().map(object -> (BoundingBox) new BVHNode(object)).toList();
         else
             this.children = splitSpace() // split space in equally sized squares
                     .map(subArea -> findObjectsInside(objects, subArea)) // uses java.awt.Shape definition of insideness.
@@ -164,10 +164,10 @@ public class BoundingBoxHierarchy implements BoundingBox {
      * @return the closest PathObject in the hierarchy, or null if there is no overlap
      * @see qupath.lib.roi.interfaces.ROI#getCentroidX() ROI.getCentroidX()
      * @see qupath.lib.roi.interfaces.ROI#getCentroidY() ROI.getCentroidY()
-     * @see BoundingBoxHierarchy#getOverlappingDetectionIfPresent(PathObject)
+     * @see BoundingBoxHierarchy#getOverlappingObjectIfPresent(PathObject)
      */
-    public PathObject getOverlappingDetection(PathObject object) {
-        return this.getOverlappingDetectionIfPresent(object).orElse(null);
+    public PathObject getOverlappingObject(PathObject object) {
+        return this.getOverlappingObjectIfPresent(object).orElse(null);
     }
 
     /**
@@ -183,10 +183,10 @@ public class BoundingBoxHierarchy implements BoundingBox {
      * @return the closest PathObject in the hierarchy as an {@link java.util.Optional Optional}
      * @see qupath.lib.roi.interfaces.ROI#getCentroidX() ROI.getCentroidX()
      * @see qupath.lib.roi.interfaces.ROI#getCentroidY() ROI.getCentroidY()
-     * @see BoundingBoxHierarchy#getOverlappingDetection(PathObject)
+     * @see BoundingBoxHierarchy#getOverlappingObject(PathObject)
      */
     @Override
-    public Optional<PathObject> getOverlappingDetectionIfPresent(PathObject object) {
+    public Optional<PathObject> getOverlappingObjectIfPresent(PathObject object) {
         ROI objectRoi = object.getROI();
         if (!objectRoi.isPoint() && !objectRoi.isEmpty()) {
             double poX = objectRoi.getBoundsX();
@@ -197,7 +197,7 @@ public class BoundingBoxHierarchy implements BoundingBox {
                 return Optional.empty();
         }
         List<PathObject> overlaps = this.children.stream()
-                .map(bvh -> bvh.getOverlappingDetectionIfPresent(object))
+                .map(bvh -> bvh.getOverlappingObjectIfPresent(object))
                 .flatMap(Optional::stream)
                 .toList();
         if (overlaps.size() < 2)
