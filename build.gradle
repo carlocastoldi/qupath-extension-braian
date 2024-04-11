@@ -49,6 +49,9 @@ tasks.test {
 
 tasks.jacocoTestReport {
     dependsOn test // tests are required to run before generating the report
+    reports {
+        csv.required = true
+    }
     doLast {
         print "INSTRUCTIONS: " + printJacocoCoverage("3")
         println "  BRANCHES: " + printJacocoCoverage("5")
