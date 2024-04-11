@@ -20,11 +20,15 @@ out/
 gradle.properties
 build/
 .gradle/
+gradle.properties
 
 # Eclipse
 .settings/
 .project
 .classpath
+
+# VSCode
+.vscode/
 
 # Mac
 .DS_Store

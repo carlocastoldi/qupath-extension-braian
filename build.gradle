@@ -15,7 +15,7 @@ plugins {
 ext.moduleName = "qupath.extension.braian"
 base {
     archivesName = rootProject.name
-    version = "1.0-SNAPSHOT"
+    version = "1.0.0-SNAPSHOT"
     description = "QuPath extension for whole-brain data extraction"
 }
 ext.qupathVersion = gradle.ext.qupathVersion

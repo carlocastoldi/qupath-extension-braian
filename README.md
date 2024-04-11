@@ -3,6 +3,7 @@ SPDX-FileCopyrightText: 2024 Carlo Castoldi <carlo.castoldi@outlook.com>
 
 SPDX-License-Identifier: CC0-1.0
 -->
+[![Javadoc](https://img.shields.io/badge/JavaDoc-Online-green)](https://carlocastoldi.github.io/qupath-extension-braian/docs/)
 
 # QuPath BraiAn extension
 
