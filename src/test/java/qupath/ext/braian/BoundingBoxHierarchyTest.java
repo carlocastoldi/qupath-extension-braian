@@ -155,4 +155,35 @@ class BoundingBoxHierarchyTest {
         assertEquals(bottomLeftCorner.getCentroidX(), (double) size /2);
         assertEquals(bottomLeftCorner.getCentroidY(), (double) size /2);
     }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3, 4, 5, 6, 7, 8, 9})
+    void rowObjectGrid(int depth) {
+        int n = (int) Math.pow(2, depth);
+        int size = 1;
+        // creates up to 262144 objects
+        Collection<PathObject> objects = createObjectGrid(n, 1, size).toList();
+        BoundingBoxHierarchy bbh = new BoundingBoxHierarchy(objects, 10);
+
+        assertEquals(depth, bbh.getDepth());
+        assertEquals(new Rectangle(0, 0, n*size, size), bbh.getBox());
+        assertEquals(new HashSet<>(objects), bbh.toStream().collect(Collectors.toSet()));
+        ROI bottomLeftCorner = bbh.getOverlappingDetection(createObject(0,0, size, size)).getROI();
+        assertEquals(bottomLeftCorner.getCentroidX(), (double) size /2);
+        assertEquals(bottomLeftCorner.getCentroidY(), (double) size /2);
+    }
+
+    @Test
+    void aboveMaxDepth() {
+        int maxDepth = 6;
+        int n = (int) Math.pow(2, 10);
+        int size = 1;
+        // creates up to 262144 objects
+        Collection<PathObject> objects = createObjectGrid(n, 1, size).toList();
+        BoundingBoxHierarchy bbh = new BoundingBoxHierarchy(objects, maxDepth);
+
+        assertEquals(maxDepth, bbh.getDepth());
+        assertEquals(new Rectangle(0, 0, n*size, size), bbh.getBox());
+        assertEquals(new HashSet<>(objects), bbh.toStream().collect(Collectors.toSet()));
+    }
 }
