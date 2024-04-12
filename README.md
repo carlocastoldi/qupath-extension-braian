@@ -3,11 +3,10 @@ SPDX-FileCopyrightText: 2024 Carlo Castoldi <carlo.castoldi@outlook.com>
 
 SPDX-License-Identifier: CC0-1.0
 -->
-[![Javadoc](https://img.shields.io/badge/JavaDoc-Online-green)](https://carlocastoldi.github.io/qupath-extension-braian/docs/)
-![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carlocastoldi/qupath-extension-braian/badges/.github/badges/jacoco.json)
-![branches coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carlocastoldi/qupath-extension-braian/badges/.github/badges/branches.json)
-
 # QuPath BraiAn extension
+[![Javadoc](https://img.shields.io/badge/JavaDoc-Online-green)](https://carlocastoldi.github.io/qupath-extension-braian/docs/)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carlocastoldi/qupath-extension-braian/badges/.github/badges/jacoco.json)](https://carlocastoldi.github.io/qupath-extension-braian/coverage/)
+[![branches coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carlocastoldi/qupath-extension-braian/badges/.github/badges/branches.json)](https://carlocastoldi.github.io/qupath-extension-braian/coverage/)
 
 Extends QuPath's functionalities for whole-brain data extraction. It works best if coupled with:
 * [`qupath-extension-abba`](https://github.com/biop/qupath-extension-abba): for importing importing brain atlas annotations from [ABBA](https://biop.github.io/ijp-imagetoatlas/)
