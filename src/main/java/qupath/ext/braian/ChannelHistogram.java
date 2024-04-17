@@ -40,17 +40,16 @@ public class ChannelHistogram {
      * Applies Applies a linear digital filter twice, once forward and once backwards.
      * The combined filter has zero phase and a filter order twice that of the original.
      * It handles the signal's edges by padding data with zeros.
-     * {@linkplain <a href="https://ieeexplore.ieee.org/document/492552">F. Gustaffson,1996</a>}
      * @param b the filter
      * @param xs the data to be filtered
      * @return the filtered output with the same shape as x.
      */
     public static List<Double> zeroPhaseFilter(List<? extends Number> b, List<? extends Number> xs) {
         // forward filtering
-        List<Double> forwardFilteredData = filter(b, xs);
+        List<Double> forwardFilteredData = convolute(b, xs);
         // backward filtering on reversed data
         Collections.reverse(forwardFilteredData);
-        List<Double> backwardFilteredData = filter(b, forwardFilteredData);
+        List<Double> backwardFilteredData = convolute(b, forwardFilteredData);
         // reverse the data back to original order
         Collections.reverse(backwardFilteredData);
         return backwardFilteredData;
@@ -62,7 +61,7 @@ public class ChannelHistogram {
      * @param inputData: signal on which the filter is applied
      * @return the filtered inputData as a {@link List<Double>}
      */
-    private static List<Double> filter(List<? extends Number> filter, List<? extends Number> inputData) {
+    private static List<Double> convolute(List<? extends Number> filter, List<? extends Number> inputData) {
         int filterSize = filter.size();
         int padSize = Math.floorDiv(filterSize, 2);
         int inputSize = inputData.size();
@@ -76,7 +75,7 @@ public class ChannelHistogram {
 
         List<Double> output = new ArrayList<>(inputSize);
 
-        for (int i = filterSize; i < paddedInputData.size(); i++) {
+        for (int i = filterSize-1; i < paddedInputData.size(); i++) {
             double sum = 0.0;
             for (int j = 0; j < filterSize; j++)
                 sum += paddedInputData.get(i - j).doubleValue() * filter.get(j).doubleValue();
