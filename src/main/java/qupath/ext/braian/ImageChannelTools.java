@@ -24,10 +24,15 @@ class IllegalChannelName extends RuntimeException {
 }
 
 public class ImageChannelTools {
-    public String name;
-    private ImageServer<BufferedImage> server;
-    private int nChannel;
+    private final String name;
+    private final ImageServer<BufferedImage> server;
+    private final int nChannel;
 
+    /**
+     * Creates an {@link ImageChannelTools} from the given channel name and {@link ImageServer}
+     * @param name name of the channel
+     * @param server image server to which the channel is referring to
+     */
     public ImageChannelTools(String name, ImageServer<BufferedImage> server) {
         this.name = name;
         this.server = server;
@@ -44,8 +49,37 @@ public class ImageChannelTools {
         throw new IllegalChannelName(this.name);
     }
 
-    private ImageStatistics getChannelStats(int downsampleLevel) throws IOException {
-        double downsample = this.server.getDownsampleForResolution(Math.min(this.server.nResolutions()-1, downsampleLevel));
+    /**
+     * @return index of the corresponding channel used by QuPath
+     */
+    public int getnChannel() {
+        return this.nChannel;
+    }
+
+    /**
+     * Computes the {@link ChannelHistogram} of the current channel at the given resolution.
+     * @param resolutionLevel Resolution level, If it's bigger than {@link ImageServer#nResolutions()}-1,
+     *                        than it uses the igven n-th resolution.
+     * @return the histogram of the given channel
+     * @throws IOException when it fails to read the image file to build the histogram
+     * @see #getChannelStats(int)
+     * @see ImageServer#getDownsampleForResolution(int)
+     */
+    public ChannelHistogram getHistogram(int resolutionLevel) throws IOException {
+        return new ChannelHistogram(this.getChannelStats(resolutionLevel));
+    }
+
+    /**
+     * Computes the {@link ImageStatistics} of the current channel at the given resolution.
+     * @param resolutionLevel Resolution level, If it's bigger than {@link ImageServer#nResolutions()}-1,
+     *                        than it uses the igven n-th resolution.
+     * @return the statistics of the channel computed by ImageJ at the given resolution
+     * @throws IOException when it fails to read the image file
+     * @see #getChannelStats(int)
+     * @see ImageServer#getDownsampleForResolution(int)
+     */
+    private ImageStatistics getChannelStats(int resolutionLevel) throws IOException {
+        double downsample = this.server.getDownsampleForResolution(Math.min(this.server.nResolutions()-1, resolutionLevel));
         RegionRequest request = RegionRequest.createInstance(this.server, downsample);
         PathImage<ImagePlus> pathImage = IJTools.convertToImagePlus(this.server, request);
         CompositeImage ci = (CompositeImage) pathImage.getImage();
@@ -57,13 +91,5 @@ public class ImageChannelTools {
         ip.resetRoi();
         ImageStatistics stats = ip.getStats();
         return stats;
-    }
-
-    public int getnChannel() {
-        return this.nChannel;
-    }
-
-    public ChannelHistogram getHistogram(int downsample) throws IOException {
-        return new ChannelHistogram(this.getChannelStats(downsample));
     }
 }

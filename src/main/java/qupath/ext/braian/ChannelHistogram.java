@@ -14,17 +14,36 @@ import java.util.stream.IntStream;
 public class ChannelHistogram {
     private final long[] values;
 
-    public ChannelHistogram(ImageStatistics stats) throws IOException {
+    /**
+     * Constructs the channel histogram from the {@link ImageStatistics} object
+     * @param stats the statistics representing a given image channel
+     */
+    public ChannelHistogram(ImageStatistics stats) {
         if(stats.histogram16 != null)
             this.values = Arrays.stream(stats.histogram16).asLongStream().toArray();
         else
             this.values = stats.getHistogram();
     }
 
+    /**
+     * Smooths the ChannelHistogram and find the color values that appear the most.
+     * <p>
+     * It applies {@link #findHistogramPeaks(int, double)} with <code>windowSize=14</code>
+     * and <code>prominence=0.01</code>
+     * @return an array of the color values
+     */
     public int[] findHistogramPeaks() {
         return findHistogramPeaks(14, 0); // 0.01
     }
 
+    /**
+     * Smooths the ChannelHistogram and find the color values that appear the most
+     * @param windowSize the size of the kernel used for smoothing the histogram
+     * @param prominence the threshold used to define whether a local maximum is a peak or not
+     * @return an array of the color values
+     * @see #findPeaks(double[], double)
+     * @see #zeroPhaseFilter(double[], double[])
+     */
     public int[] findHistogramPeaks(int windowSize, double prominence) {
         // movingAvg is a moving average linear digital filter
         double[] movingAvg = new double[windowSize];
@@ -87,6 +106,12 @@ public class ChannelHistogram {
         }
     }
 
+    /**
+     * Finds the local maxima that peak above the nearby data
+     * @param x the data
+     * @param prominence the threshold above which a local maximum is considered a peak
+     * @return the positions of the peaks inside x
+     */
     public static int[] findPeaks(double[] x, double prominence) {
         int[] peaks = localMaxima(x);
         return Arrays.stream(peaks)

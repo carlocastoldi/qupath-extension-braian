@@ -90,7 +90,8 @@ public class BoundingBoxHierarchy implements BoundingBox {
     private final Collection<BoundingBox> children;
 
     /**
-     * Builds a top-down <a href="https://en.wikipedia.org/wiki/Bounding_volume_hierarchy">BVH</a>
+     * Builds a top-down <a href="https://en.wikipedia.org/wiki/Bounding_volume_hierarchy">BVH</a> of maximum 6 levels
+     * of hierarchy.
      * @param objects the given objects to insert into the hierarchy
      */
     public BoundingBoxHierarchy(Collection<PathObject> objects) {
