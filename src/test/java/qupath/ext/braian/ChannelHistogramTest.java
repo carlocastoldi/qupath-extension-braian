@@ -9,9 +9,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
@@ -81,18 +78,17 @@ public class ChannelHistogramTest {
 
     @Test
     void zeroPhaseFilterBasic() {
-        List<Double> inputSignal = new java.util.ArrayList<>(IntStream.range(0, 12).mapToDouble(d -> d).boxed().toList());
-        Collections.reverse(inputSignal);
-        List<Double> output;
+        double[] inputSignal = IntStream.range(0, 12).mapToDouble(d -> d).toArray();
+        double[] output;
 
-        output = ChannelHistogram.zeroPhaseFilter(List.of(0., 0., 1., 0., 0.), inputSignal);
-        assertArrayEquals(inputSignal.toArray(), output.toArray());
+        output = ChannelHistogram.zeroPhaseFilter(new double[]{0., 0., 1., 0., 0.}, inputSignal);
+        assertArrayEquals(inputSignal, output);
 
-        output = ChannelHistogram.zeroPhaseFilter(List.of(0., 1., 0.), inputSignal);
-        assertArrayEquals(inputSignal.toArray(), output.toArray());
+        output = ChannelHistogram.zeroPhaseFilter(new double[]{0., 1., 0.}, inputSignal);
+        assertArrayEquals(inputSignal, output);
 
-        output = ChannelHistogram.zeroPhaseFilter(List.of(1.), inputSignal);
-        assertArrayEquals(inputSignal.toArray(), output.toArray());
+        output = ChannelHistogram.zeroPhaseFilter(new double[]{1.}, inputSignal);
+        assertArrayEquals(inputSignal, output);
     }
 
     @Test
@@ -117,9 +113,9 @@ public class ChannelHistogramTest {
                     return cleanSignal[i]+spike;
                 }).toArray();
 
-        List<Double> b = new ArrayList<>(Collections.nCopies(windowSize, (double) 1 / windowSize));
-        double[] cleanedSignal = ChannelHistogram.zeroPhaseFilter(b, Arrays.stream(noisySignal).boxed().toList())
-                .stream().mapToDouble(d->d).toArray();
+        double[] movingAvg = new double[windowSize];
+        Arrays.fill(movingAvg, (double) 1/windowSize);
+        double[] cleanedSignal = ChannelHistogram.zeroPhaseFilter(movingAvg, noisySignal);
 
         assertEquals(IntStream.range(0,cleanSignal.length)
                 .mapToDouble(i -> Math.abs(noisySignal[i]-cleanSignal[i]))

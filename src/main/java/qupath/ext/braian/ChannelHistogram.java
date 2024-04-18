@@ -8,19 +8,17 @@ import ij.process.ImageStatistics;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 public class ChannelHistogram {
-    private final List<Long> values;
+    private final long[] values;
 
     public ChannelHistogram(ImageStatistics stats) throws IOException {
-        long[] hist;
         if(stats.histogram16 != null)
-            hist = Arrays.stream(stats.histogram16).asLongStream().toArray();
+            this.values = Arrays.stream(stats.histogram16).asLongStream().toArray();
         else
-            hist = stats.getHistogram();
-        this.values = Arrays.stream(hist).boxed().toList();
+            this.values = stats.getHistogram();
     }
 
     public int[] findHistogramPeaks() {
@@ -28,10 +26,11 @@ public class ChannelHistogram {
     }
 
     public int[] findHistogramPeaks(int windowSize, double prominence) {
-        // b is a moving average linear digital filter
-        List<Double> b = new ArrayList<>(Collections.nCopies(windowSize, (double) 1 / windowSize));
-        double[] smoothed = zeroPhaseFilter(b, this.values).stream()
-                .map(Math::round).mapToDouble(d->d).toArray();
+        // movingAvg is a moving average linear digital filter
+        double[] movingAvg = new double[windowSize];
+        Arrays.fill(movingAvg, (double) 1/windowSize);
+        double[] hist = Arrays.stream(this.values).asDoubleStream().toArray();
+        double[] smoothed = zeroPhaseFilter(movingAvg, hist);
         double histogramMax = Arrays.stream(smoothed).max().getAsDouble();
         return findPeaks(smoothed, prominence * histogramMax);
     }
@@ -40,48 +39,52 @@ public class ChannelHistogram {
      * Applies Applies a linear digital filter twice, once forward and once backwards.
      * The combined filter has zero phase and a filter order twice that of the original.
      * It handles the signal's edges by padding data with zeros.
-     * @param b the filter
+     * @param f the filter
      * @param xs the data to be filtered
      * @return the filtered output with the same shape as x.
      */
-    public static List<Double> zeroPhaseFilter(List<? extends Number> b, List<? extends Number> xs) {
+    public static double[] zeroPhaseFilter(double[] f, double[] xs) {
         // forward filtering
-        List<Double> forwardFilteredData = convolute(b, xs);
+        double[] forwardFilteredData = convolute(f, xs);
         // backward filtering on reversed data
-        Collections.reverse(forwardFilteredData);
-        List<Double> backwardFilteredData = convolute(b, forwardFilteredData);
+        reverse(forwardFilteredData);
+        double[] backwardFilteredData = convolute(f, forwardFilteredData);
         // reverse the data back to original order
-        Collections.reverse(backwardFilteredData);
+        reverse(backwardFilteredData);
         return backwardFilteredData;
     }
 
     /**
-     * Applies a filter to a signal as a convolution. It handles the signal's edges by padding inputData with zeros.
-     * @param filter: filter to apply
-     * @param inputData: signal on which the filter is applied
-     * @return the filtered inputData as a {@link List<Double>}
+     * Convolutes a kernel to a signal. It handles the signal's edges by padding signal with zeros.
+     *
+     * @param kernel:    kernel to apply
+     * @param signal: signal on which the kernel is applied
+     * @return the filtered signal as a double array
      */
-    private static List<Double> convolute(List<? extends Number> filter, List<? extends Number> inputData) {
-        int filterSize = filter.size();
-        int padSize = Math.floorDiv(filterSize, 2);
-        int inputSize = inputData.size();
+    private static double[] convolute(double[] kernel, double[] signal) {
+        int padSize = Math.floorDiv(kernel.length, 2);
 
-        List<Number> paddedInputData = Stream.concat(
-                Stream.generate(() -> 0).limit(padSize),          //IntStream.range(0,padSize).mapToObj(i -> inputData.get(padSize-i)),
-                Stream.concat(
-                        inputData.stream(),
-                        Stream.generate(() -> 0).limit(padSize))  // IntStream.range(0,padSize).mapToObj(i -> inputData.get(inputSize-padSize-i)))
-        ).toList();
+        double[] paddedInputData = DoubleStream.concat(
+                DoubleStream.generate(() -> 0).limit(padSize),          // DoubleStream.range(0,padSize).mapToObj(i -> signal[padSize-i]),
+                DoubleStream.concat(
+                        Arrays.stream(signal),
+                        DoubleStream.generate(() -> 0).limit(padSize))  // DoubleStream.range(0,padSize).mapToObj(i -> signal[inputSize-padSize-i]))
+        ).toArray();
 
-        List<Double> output = new ArrayList<>(inputSize);
+        return IntStream.range(kernel.length-1, paddedInputData.length)
+                .mapToDouble(i -> IntStream.range(0, kernel.length)
+                        .mapToDouble(j -> paddedInputData[i-j] * kernel[j])
+                        .sum())
+                .toArray();
+    }
 
-        for (int i = filterSize-1; i < paddedInputData.size(); i++) {
-            double sum = 0.0;
-            for (int j = 0; j < filterSize; j++)
-                sum += paddedInputData.get(i - j).doubleValue() * filter.get(j).doubleValue();
-            output.add(sum);
+    static void reverse(double[] a) {
+        double temp;
+        for (int i = 0; i < a.length / 2; i++) {
+            temp = a[i];
+            a[i] = a[a.length - i - 1];
+            a[a.length - i - 1] = temp;
         }
-        return output;
     }
 
     public static int[] findPeaks(double[] x, double prominence) {
