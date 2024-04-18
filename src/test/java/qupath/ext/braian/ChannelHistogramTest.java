@@ -9,6 +9,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
@@ -74,6 +76,25 @@ public class ChannelHistogramTest {
             return xs.length-1-peak;
         }).toArray();
         assertArrayEquals(peaksTrueRev, ChannelHistogram.findPeaks(xsRev, prominence));
+    }
+
+    List<Double> applyTransformation(List<Double> inputSignal, int filterSize) {
+        // Pad the input signal with zeros at the beginning and end
+        List<Double> paddedInputSignal = new java.util.ArrayList<>(Collections.nCopies(filterSize - 1, 0.0));
+        paddedInputSignal.addAll(inputSignal);
+        paddedInputSignal.addAll(Collections.nCopies(filterSize - 1, 0.0));
+        return paddedInputSignal;
+    }
+
+    @Test
+    void zeroPhaseFilterBasic() {
+        List<Double> filter = Arrays.asList(0., 0., 1., 0.);
+        List<Double> inputSignal = new java.util.ArrayList<>(IntStream.range(0, 12).mapToDouble(d -> d).boxed().toList());
+        Collections.reverse(inputSignal);
+
+        List<Double> output = ChannelHistogram.zeroPhaseFilter(filter, inputSignal);
+
+        assertArrayEquals(inputSignal.toArray(), output.toArray());
     }
 
 }

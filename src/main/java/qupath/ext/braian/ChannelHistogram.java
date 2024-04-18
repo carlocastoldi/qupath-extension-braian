@@ -7,11 +7,9 @@ package qupath.ext.braian;
 import ij.process.ImageStatistics;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public class ChannelHistogram {
     private final List<Long> values;
@@ -30,15 +28,23 @@ public class ChannelHistogram {
     }
 
     public int[] findHistogramPeaks(int windowSize, double prominence) {
+        // b is a moving average linear digital filter
         List<Double> b = new ArrayList<>(Collections.nCopies(windowSize, (double) 1 / windowSize));
         double[] smoothed = zeroPhaseFilter(b, this.values).stream()
                 .map(Math::round).mapToDouble(d->d).toArray();
-        // long[] smoothed = zeroPhaseFilter(b, this.values).stream()
-        //        .map(Math::round).mapToLong(l->l).toArray();
         double histogramMax = Arrays.stream(smoothed).max().getAsDouble();
         return findPeaks(smoothed, prominence * histogramMax);
     }
 
+    /**
+     * Applies Applies a linear digital filter twice, once forward and once backwards.
+     * The combined filter has zero phase and a filter order twice that of the original.
+     * It handles the signal's edges by padding data with zeros.
+     * {@linkplain <a href="https://ieeexplore.ieee.org/document/492552">F. Gustaffson,1996</a>}
+     * @param b the filter
+     * @param xs the data to be filtered
+     * @return the filtered output with the same shape as x.
+     */
     public static List<Double> zeroPhaseFilter(List<? extends Number> b, List<? extends Number> xs) {
         // forward filtering
         List<Double> forwardFilteredData = filter(b, xs);
@@ -50,19 +56,30 @@ public class ChannelHistogram {
         return backwardFilteredData;
     }
 
+    /**
+     * Applies a filter to a signal as a convolution. It handles the signal's edges by padding inputData with zeros.
+     * @param filter: filter to apply
+     * @param inputData: signal on which the filter is applied
+     * @return the filtered inputData as a {@link List<Double>}
+     */
     private static List<Double> filter(List<? extends Number> filter, List<? extends Number> inputData) {
         int filterSize = filter.size();
+        int padSize = Math.floorDiv(filterSize, 2);
         int inputSize = inputData.size();
+
+        List<Number> paddedInputData = Stream.concat(
+                Stream.generate(() -> 0).limit(padSize),          //IntStream.range(0,padSize).mapToObj(i -> inputData.get(padSize-i)),
+                Stream.concat(
+                        inputData.stream(),
+                        Stream.generate(() -> 0).limit(padSize))  // IntStream.range(0,padSize).mapToObj(i -> inputData.get(inputSize-padSize-i)))
+        ).toList();
 
         List<Double> output = new ArrayList<>(inputSize);
 
-        for (int i = 0; i < inputSize; i++) {
+        for (int i = filterSize; i < paddedInputData.size(); i++) {
             double sum = 0.0;
-            for (int j = 0; j < filterSize; j++) {
-                int index = i - j;
-                double inputValue = index >= 0 ? inputData.get(index).doubleValue() : 0.0;
-                sum += filter.get(j).doubleValue() * inputValue;
-            }
+            for (int j = 0; j < filterSize; j++)
+                sum += paddedInputData.get(i - j).doubleValue() * filter.get(j).doubleValue();
             output.add(sum);
         }
         return output;
