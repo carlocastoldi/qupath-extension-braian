@@ -71,9 +71,14 @@ class BoundingBoxHierarchyTest {
 
     @Test
     void emptyObjectsBBH() {
-        Throwable e = assertThrows(IllegalArgumentException.class,
-                () -> new BoundingBoxHierarchy(new ArrayList<>(), 6));
-        assertEquals("BoundingBoxHierarchy cannot store zero objects", e.getMessage());
+        BoundingBoxHierarchy bbh = new BoundingBoxHierarchy(new ArrayList<>(), 6);
+        PathObject object = mock(PathObject.class);
+
+        assertTrue(bbh.isEmpty());
+        assertNull(bbh.getOverlappingObject(object));
+        assertTrue(bbh.toStream().toList().isEmpty());
+        assertTrue(bbh.getBox().isEmpty());
+        assertEquals(-1, bbh.getDepth());
     }
 
     @Test

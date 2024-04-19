@@ -104,12 +104,15 @@ public class BoundingBoxHierarchy implements BoundingBox {
      * @param maxDepth the maximum depth that that hierarchy can have.
      *                 Below maxDepth, the recursive structure stops and lists all the remaining objects
      */
-    public BoundingBoxHierarchy(Collection<PathObject> objects, int maxDepth) {
+    public BoundingBoxHierarchy(Collection<? extends PathObject> objects, int maxDepth) {
         // top-down construction
         if (maxDepth < 1)
             throw new IllegalArgumentException("maxDepth must be >1. Instead got maxDepth="+maxDepth);
-        if (objects.isEmpty())
-            throw new IllegalArgumentException("BoundingBoxHierarchy cannot store zero objects");
+        if (objects.isEmpty()) {
+            this.bbox = new Rectangle2D.Double();
+            this.children = Arrays.asList();
+            return;
+        }
         if (objects.stream().anyMatch(o -> {ROI roi = o.getROI(); return roi.isPoint() && roi.getNumPoints() > 1;}))
             throw new IllegalArgumentException("BoundingBoxHierarchy cannot handle PointsROI objects with multiple points");
         double minX = objects.stream().map(object -> object.getROI().getBoundsX()).min(Double::compare).get();
@@ -126,7 +129,6 @@ public class BoundingBoxHierarchy implements BoundingBox {
                     .filter(Predicate.not(Collection::isEmpty))
                     .map(insideSubArea -> createChildBoundingBox(insideSubArea, maxDepth))
                     .toList();
-        assert !this.children.isEmpty();
     }
 
     private Stream<Rectangle2D> splitSpace() {
@@ -138,13 +140,13 @@ public class BoundingBoxHierarchy implements BoundingBox {
         return Arrays.stream(asd).map(pos -> new Rectangle2D.Double(pos[0], pos[1], length, length));
     }
 
-    private List<PathObject> findObjectsInside(Collection<PathObject> objects, Shape area) {
+    private List<? extends PathObject> findObjectsInside(Collection<? extends PathObject> objects, Shape area) {
         return objects.stream()
                 .filter(o -> area.contains(o.getROI().getCentroidX(), o.getROI().getCentroidY()))
                 .toList();
     }
 
-    private BoundingBox createChildBoundingBox(List<PathObject> objectsInside, int nLevels) {
+    private BoundingBox createChildBoundingBox(List<? extends PathObject> objectsInside, int nLevels) {
         assert !objectsInside.isEmpty();
         if (objectsInside.size() == 1)
             return new BVHNode(objectsInside.get(0));
@@ -168,6 +170,7 @@ public class BoundingBoxHierarchy implements BoundingBox {
      * @see BoundingBoxHierarchy#getOverlappingObjectIfPresent(PathObject)
      */
     public PathObject getOverlappingObject(PathObject object) {
+        // TODO: rename to getObjectOverlappingCentroid
         return this.getOverlappingObjectIfPresent(object).orElse(null);
     }
 
@@ -188,6 +191,8 @@ public class BoundingBoxHierarchy implements BoundingBox {
      */
     @Override
     public Optional<PathObject> getOverlappingObjectIfPresent(PathObject object) {
+        if(this.isEmpty()) // if the BBH is empty
+            return Optional.empty();
         ROI objectRoi = object.getROI();
         if (!objectRoi.isPoint() && !objectRoi.isEmpty()) {
             double poX = objectRoi.getBoundsX();
@@ -205,6 +210,11 @@ public class BoundingBoxHierarchy implements BoundingBox {
             return overlaps.stream().findFirst();
         // there are more than one object overlapping
         return Optional.of(getClosestOverlap(overlaps, object));
+    }
+
+    public boolean isEmpty() {
+        // if the bbox is empty, it could still mean that there is one object with PointsROI or something similar
+        return this.children.isEmpty();
     }
 
     private PathObject getClosestOverlap(List<PathObject> overlaps, PathObject object) {
@@ -242,10 +252,13 @@ public class BoundingBoxHierarchy implements BoundingBox {
 
     /**
      * Compute the BoundingBoxHierarchy's maximum depth
-     * @return the maximum depth of the hierarchy
+     * @return the maximum depth of the hierarchy. Returns -1 if the BoundingBoxHierarchy is empty.
      */
     @Override
     public int getDepth() {
-        return this.children.stream().map(BoundingBox::getDepth).max(Integer::compare).get()+1;
+        return this.children.stream()
+                .map(BoundingBox::getDepth)
+                .max(Integer::compare)
+                .orElseGet(() -> -2)+1;
     }
 }
