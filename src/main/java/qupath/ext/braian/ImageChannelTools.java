@@ -12,16 +12,25 @@ import qupath.imagej.tools.IJTools;
 import qupath.lib.images.PathImage;
 import qupath.lib.images.servers.ImageChannel;
 import qupath.lib.images.servers.ImageServer;
+import qupath.lib.objects.PathAnnotationObject;
+import qupath.lib.objects.PathDetectionObject;
+import qupath.lib.objects.PathObject;
+import qupath.lib.objects.classes.PathClass;
+import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.regions.RegionRequest;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.*;
+
+import static qupath.lib.scripting.QP.*;
 
 class IllegalChannelName extends RuntimeException {
     public IllegalChannelName(String name) {
-        super(String.format("Cannot find a channel named '{}'!", name));
+        super(String.format("Cannot find a channel named '"+name+"'!"));
     }
 }
+
 
 public class ImageChannelTools {
     private final String name;
@@ -78,7 +87,7 @@ public class ImageChannelTools {
      * @see #getChannelStats(int)
      * @see ImageServer#getDownsampleForResolution(int)
      */
-    private ImageStatistics getChannelStats(int resolutionLevel) throws IOException {
+    public ImageStatistics getChannelStats(int resolutionLevel) throws IOException {
         double downsample = this.server.getDownsampleForResolution(Math.min(this.server.nResolutions()-1, resolutionLevel));
         RegionRequest request = RegionRequest.createInstance(this.server, downsample);
         PathImage<ImagePlus> pathImage = IJTools.convertToImagePlus(this.server, request);
@@ -91,5 +100,9 @@ public class ImageChannelTools {
         ip.resetRoi();
         ImageStatistics stats = ip.getStats();
         return stats;
+    }
+
+    public String getName() {
+        return this.name;
     }
 }
