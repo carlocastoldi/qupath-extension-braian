@@ -6,7 +6,6 @@ package qupath.ext.braian;
 
 import ij.process.ImageStatistics;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;

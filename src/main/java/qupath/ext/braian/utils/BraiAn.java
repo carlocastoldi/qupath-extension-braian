@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Carlo Castoldi <carlo.castoldi@outlook.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package qupath.ext.braian.utils;
 
 import qupath.fx.utils.FXUtils;
@@ -16,7 +20,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static qupath.lib.scripting.QP.getProject;
 

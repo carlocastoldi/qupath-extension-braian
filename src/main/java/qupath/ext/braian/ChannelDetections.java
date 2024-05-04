@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Carlo Castoldi <carlo.castoldi@outlook.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package qupath.ext.braian;
 
 import qupath.ext.braian.utils.BraiAn;
@@ -75,11 +79,12 @@ public class ChannelDetections {
     }
 
     /**
-     * Computes the detections computed in "annotation".
+     * Computes the detections in "annotation".
+     * @param channel
+     * @param annotation
      * @param params
-     * @param annotations
+     * @param hierarchy
      * @return
-     * @throws InterruptedException
      */
     private static PathAnnotationObject computeInside(ImageChannelTools channel, PathAnnotationObject annotation, WatershedCellDetectionParameters params, PathObjectHierarchy hierarchy) {
         annotation.setLocked(true);
@@ -137,7 +142,7 @@ public class ChannelDetections {
     /**
      * returns the detections inside the given annotation
      * @param annotation
-     * @param all
+     * @param hierarchy
      * @return
      */
     private static Stream<PathDetectionObject> getDetectionsInside(PathAnnotationObject annotation, PathObjectHierarchy hierarchy) {
@@ -160,7 +165,7 @@ public class ChannelDetections {
     private BoundingBoxHierarchy bbh;
 
     public ChannelDetections(ImageChannelTools channel, PathObjectHierarchy hierarchy) {
-        this(channel.getName(), ChannelDetections::getOverlapContainersName, hierarchy);
+        this(channel.getName(), ChannelDetections::getBasicContainersName, hierarchy);
     }
 
     // private ChannelDetections(UUID otherSecret, String id, PathObjectHierarchy hierarchy) {
@@ -175,18 +180,18 @@ public class ChannelDetections {
     public void fireUpdate() {
         this.containers = this.searchContainers();
         List<PathDetectionObject> cells = this.getContainersDetections(false);
-        this.bbh = new BoundingBoxHierarchy(cells, this.BBH_MAX_DEPTH);
+        this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
     }
 
-    public void applyClassifiers(Map<ObjectClassifier, List<PathAnnotationObject>> partialClassifiers, ImageData imageData) {
+    public <T> void applyClassifiers(Map<ObjectClassifier<T>, List<PathAnnotationObject>> partialClassifiers, ImageData<T> imageData) {
         List<PathDetectionObject> cells = new ArrayList<>();
-        partialClassifiers.forEach((classifier, annotations) -> {
-            cells.addAll(this.classifyInside(classifier, annotations, imageData));
+        partialClassifiers.keySet().forEach(classifier -> {
+            cells.addAll(this.classifyInside(classifier, partialClassifiers.get(classifier), imageData));
         });
-        this.bbh = new BoundingBoxHierarchy(cells, this.BBH_MAX_DEPTH);
+        this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
     }
 
-    private List<PathDetectionObject> classifyInside(ObjectClassifier classifier, Collection<PathAnnotationObject> annotations, ImageData imageData) {
+    private <T> List<PathDetectionObject> classifyInside(ObjectClassifier<T> classifier, Collection<PathAnnotationObject> annotations, ImageData<T> imageData) {
         List<PathDetectionObject> cells;
         if(annotations == null || annotations.isEmpty())
             cells = this.getContainersDetections(true); // get ALL detections. Even those there were discarded
@@ -207,9 +212,9 @@ public class ChannelDetections {
         List<PathObject> overlaps = this.bbh.toStream().flatMap( cell -> {
             List<String> idWithOverlaps = otherDetections.stream()
                     .filter(other -> other.bbh.getOverlappingObjectIfPresent(cell).isPresent())
-                    .map(other -> other.getId())
+                    .map(ChannelDetections::getId)
                     .toList();
-            if(idWithOverlaps.size() == 0)
+            if(idWithOverlaps.isEmpty())
                 return Stream.empty();
             String className = Stream.concat(Stream.of(this.getId()), idWithOverlaps.stream())
                     .collect(Collectors.joining(ChannelDetections.OVERLAP_DELIMITER));
@@ -237,7 +242,7 @@ public class ChannelDetections {
 
     private List<PathAnnotationObject> searchContainers() {
         return this.hierarchy.getAnnotationObjects().stream()
-                .filter(a -> this.isContainer(a))
+                .filter(this::isContainer)
                 .map(a -> (PathAnnotationObject) a)
                 .toList();
     }
@@ -251,7 +256,7 @@ public class ChannelDetections {
     }
 
     public PathClass getPathClass() {
-        return this.getPathClass(this.id);
+        return getPathClass(this.id);
     }
 
     public PathClass getDiscardedDetectionsPathClass() {

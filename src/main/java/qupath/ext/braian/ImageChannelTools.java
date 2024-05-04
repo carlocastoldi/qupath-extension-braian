@@ -105,4 +105,9 @@ public class ImageChannelTools {
     public String getName() {
         return this.name;
     }
+
+    public ChannelDetections getDetections(PathObjectHierarchy hierarchy) {
+        System.out.println("ciao!");
+        return new ChannelDetections(this, hierarchy);
+    }
 }
