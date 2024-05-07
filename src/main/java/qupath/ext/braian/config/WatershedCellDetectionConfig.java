@@ -2,13 +2,17 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package qupath.ext.braian;
+package qupath.ext.braian.config;
 
+import qupath.ext.braian.BraiAnExtension;
+import qupath.ext.braian.ImageChannelTools;
+
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-public class WatershedCellDetectionParameters {
+public class WatershedCellDetectionConfig {
     private String detectionImage;
     private double requestedPixelSizeMicrons = 0.5;
     private double backgroundRadiusMicrons = 8.0;
@@ -17,16 +21,21 @@ public class WatershedCellDetectionParameters {
     private double sigmaMicrons = 1.5;
     private double minAreaMicrons = 10.0;
     private double maxAreaMicrons = 400.0;
-    private double threshold = -1.0; //100.0
+    private double threshold = 100.0;
+    private AutoThresholdParmameters histogramThreshold = null;
     private boolean watershedPostProcess = true;
     private double cellExpansionMicrons = 5.0;
     private boolean includeNuclei = false;
     private boolean smoothBoundaries = true;
     private boolean makeMeasurements = true;
 
-    public Map<String,?> toMap() {
-        return Arrays.stream(WatershedCellDetectionParameters.class.getDeclaredFields())
-                .filter(f -> !f.isSynthetic())
+    public Map<String,?> toParameters(ImageChannelTools channel) {
+        this.setDetectionImage(channel.getName());
+        if (this.histogramThreshold != null)
+            this.setThreshold(findThreshold(channel, this.histogramThreshold));
+
+        return Arrays.stream(WatershedCellDetectionConfig.class.getDeclaredFields())
+                .filter(f -> !f.isSynthetic() && !f.getName().equals("histogramThreshold"))
                 .reduce(
                         new HashMap<>(),
                         (map, field) -> {
@@ -42,6 +51,20 @@ public class WatershedCellDetectionParameters {
                             return map1;
                         }
                 );
+    }
+
+    private int findThreshold(ImageChannelTools channel, AutoThresholdParmameters params) {
+        int[] peaks;
+        try {
+            peaks = channel.getHistogram(params.getResolutionLevel())
+                    .findHistogramPeaks(params.getSmoothWindowSize(), params.getPeakProminence());
+        } catch (IOException ignored) {
+            throw new RuntimeException("Could not build the channel histogram of '"+detectionImage+"' to automatically determine the threshold!");
+        }
+        BraiAnExtension.getLogger().debug("'"+channel.getName()+"' histogram peaks: "+Arrays.toString(peaks));
+        if(peaks.length <= params.getnPeak())
+            throw new RuntimeException("Could not automatically determine the channel threshold of '"+detectionImage+"' from its histogram!");
+        return peaks[params.getnPeak()];
     }
 
     public String getDetectionImage() {
@@ -154,5 +177,13 @@ public class WatershedCellDetectionParameters {
 
     public void setMakeMeasurements(boolean makeMeasurements) {
         this.makeMeasurements = makeMeasurements;
+    }
+
+    public AutoThresholdParmameters getHistogramThreshold() {
+        return histogramThreshold;
+    }
+
+    public void setHistogramThreshold(AutoThresholdParmameters histogramThreshold) {
+        this.histogramThreshold = histogramThreshold;
     }
 }

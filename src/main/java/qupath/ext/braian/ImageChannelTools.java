@@ -23,18 +23,15 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.*;
 
-import static qupath.lib.scripting.QP.*;
-
 class IllegalChannelName extends RuntimeException {
     public IllegalChannelName(String name) {
         super(String.format("Cannot find a channel named '"+name+"'!"));
     }
 }
 
-
 public class ImageChannelTools {
     private final String name;
-    private final ImageServer<BufferedImage> server;
+    private final ImageServer server;
     private final int nChannel;
 
     /**
@@ -42,7 +39,7 @@ public class ImageChannelTools {
      * @param name name of the channel
      * @param server image server to which the channel is referring to
      */
-    public ImageChannelTools(String name, ImageServer<BufferedImage> server) {
+    public <T> ImageChannelTools(String name, ImageServer<T> server) {
         this.name = name;
         this.server = server;
         this.nChannel = this.findNChannel();
@@ -107,7 +104,6 @@ public class ImageChannelTools {
     }
 
     public ChannelDetections getDetections(PathObjectHierarchy hierarchy) {
-        System.out.println("ciao!");
         return new ChannelDetections(this, hierarchy);
     }
 }

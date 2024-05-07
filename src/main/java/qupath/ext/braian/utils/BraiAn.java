@@ -33,25 +33,7 @@ public class BraiAn {
             if (Files.exists(filePath))
                 return filePath;
         }
-        throw new FileNotFoundException("Can't find the specified file: '${fileName}'");
-    }
-
-    public static ObjectClassifier loadObjectClassifierFromPath(Path path) throws IOException {
-        // inspired by QP.loadObjectClassifier()
-        ObjectClassifier classifier = null;
-        Exception exception = null;
-
-        try {
-            classifier = ObjectClassifiers.readClassifier(path);
-        } catch (Exception e) { exception = e; }
-        if (classifier == null)
-            throw new IOException("Unable to find object classifier " + path, exception);
-
-        // Try to fix URIs, if we can
-        if (classifier instanceof UriResource)
-            UriUpdater.fixUris((UriResource)classifier, getProject());
-
-        return classifier;
+        throw new FileNotFoundException("Can't find the specified file: '"+fileName+"'");
     }
 
     public static void populatePathClassGUI(PathClass... toAdd) {

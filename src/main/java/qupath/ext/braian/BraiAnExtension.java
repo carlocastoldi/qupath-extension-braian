@@ -14,6 +14,10 @@ public class BraiAnExtension implements QuPathExtension, GitHubProject {
 
     static final Logger logger = LoggerFactory.getLogger(BraiAnExtension.class);
 
+    public static Logger getLogger() {
+        return logger;
+    }
+
     @Override
     public GitHubRepo getRepository() {
         return GitHubRepo.create("BraiAn extension", "carlocastoldi", "qupath-extension-braian");

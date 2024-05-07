@@ -4,6 +4,7 @@
 
 package qupath.ext.braian;
 
+import qupath.ext.braian.config.WatershedCellDetectionConfig;
 import qupath.ext.braian.utils.BraiAn;
 import qupath.lib.classifiers.object.ObjectClassifier;
 import qupath.lib.images.ImageData;
@@ -19,14 +20,23 @@ import qupath.lib.scripting.QP;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static qupath.lib.scripting.QP.*;
-import static qupath.lib.scripting.QP.getPathClass;
+import static qupath.lib.scripting.QP.createFullImageAnnotation;
+import static qupath.lib.scripting.QP.selectObjects;
 
 class EmptyDetectionsException extends RuntimeException {
     public EmptyDetectionsException() {
         super("No detection was pre-computed in the given image! You first need to call ChannelDetections.compute()");
+    }
+}
+
+class IncompatibleClassifier extends Exception {
+    public IncompatibleClassifier(Collection<PathClass> classifierOutputs, PathClass channelClass, PathClass discardedChannelClass) {
+        super("The provided classifier is incompatibile.\n" +
+                "Expected: ["+channelClass+", "+discardedChannelClass+"]\n" +
+                "Got: "+classifierOutputs.toString());
     }
 }
 
@@ -63,17 +73,18 @@ public class ChannelDetections {
         }
     }
 
-    public static ChannelDetections compute(ImageChannelTools channel, WatershedCellDetectionParameters params, PathAnnotationObject annotation, PathObjectHierarchy hierarchy) {
+    public static ChannelDetections compute(ImageChannelTools channel, WatershedCellDetectionConfig params, PathAnnotationObject annotation, PathObjectHierarchy hierarchy) {
         return ChannelDetections.compute(channel, params, annotation != null ? List.of(annotation) : null, hierarchy);
     }
 
-    public static ChannelDetections compute(ImageChannelTools channel, WatershedCellDetectionParameters params, Collection<PathAnnotationObject> annotations, PathObjectHierarchy hierarchy) {
+    public static ChannelDetections compute(ImageChannelTools channel, WatershedCellDetectionConfig config, Collection<PathAnnotationObject> annotations, PathObjectHierarchy hierarchy) {
+        Map<String, ?> params = config.toParameters(channel);
         if(annotations == null || annotations.isEmpty()) {
             // throw new IllegalArgumentException("You must give at least one annotation on which to compute the detections");
             PathAnnotationObject fullImage = ChannelDetections.getFullImageDetectionAnnotation(hierarchy);
             annotations = List.of(fullImage);
         }
-        // TODO: check if the given annotations overlap. If they do, throw an error as that would duplicate annotations
+        // TODO: check if the given annotations overlap. If they do, throw an error as that would duplicate detections
         List<PathAnnotationObject> containers = annotations.stream().map(ann -> ChannelDetections.computeInside(channel, ann, params, hierarchy)).toList();
         return new ChannelDetections(channel, hierarchy);
     }
@@ -86,17 +97,12 @@ public class ChannelDetections {
      * @param hierarchy
      * @return
      */
-    private static PathAnnotationObject computeInside(ImageChannelTools channel, PathAnnotationObject annotation, WatershedCellDetectionParameters params, PathObjectHierarchy hierarchy) {
+    private static PathAnnotationObject computeInside(ImageChannelTools channel, PathAnnotationObject annotation, Map<String,?> params, PathObjectHierarchy hierarchy) {
         annotation.setLocked(true);
-        // TODO: add the commented lines to a function calling getDetections() on all ImageChannelTools
-        // BraiAnExtension.logger.info("The annotation selected for the detections is: "+annotation);
-        // if(annotation.hasChildObjects())
-        //     this.hierarchy.removeObjects(annotation.getChildObjects(), false);
         PathAnnotationObject container = ChannelDetections.createBasicContainer(annotation, channel, hierarchy);
         selectObjects(container);
         try {
-            params.setDetectionImage(channel.getName());
-            QP.runPlugin("qupath.imagej.detect.cells.WatershedCellDetection", params.toMap());
+            QP.runPlugin("qupath.imagej.detect.cells.WatershedCellDetection", params);
             ChannelDetections.getChildrenDetections(container).forEach(detection -> detection.setPathClass(container.getPathClass()));
             return container;
         } catch (InterruptedException e) {
@@ -183,24 +189,46 @@ public class ChannelDetections {
         this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
     }
 
-    public <T> void applyClassifiers(Map<ObjectClassifier<T>, List<PathAnnotationObject>> partialClassifiers, ImageData<T> imageData) {
+    public <T,U> void applyClassifiers(List<AnnotationClassifier> classifiers, ImageData<U> imageData) {
+        classifiers = removeUselessClassifiers(classifiers);
         List<PathDetectionObject> cells = new ArrayList<>();
-        partialClassifiers.keySet().forEach(classifier -> {
-            cells.addAll(this.classifyInside(classifier, partialClassifiers.get(classifier), imageData));
-        });
+        for (AnnotationClassifier partialClassifier: classifiers) {
+            ObjectClassifier classifier = partialClassifier.getClassifier();
+            Collection<PathAnnotationObject> toClassify = partialClassifier.getAnnotations();
+            try {
+                cells.addAll(this.classifyInside(classifier, toClassify, imageData));
+            } catch (IncompatibleClassifier e) {
+                BraiAnExtension.logger.warn("Skipping "+classifier+"...\n\t"+e.getMessage().replace("\n", "\n\t"));
+                return;
+            }
+        }
         this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
     }
 
-    private <T> List<PathDetectionObject> classifyInside(ObjectClassifier<T> classifier, Collection<PathAnnotationObject> annotations, ImageData<T> imageData) {
+    private static List<AnnotationClassifier> removeUselessClassifiers(List<AnnotationClassifier> partialClassifiers) {
+        int lastFullClassifier = -1;
+        int n = partialClassifiers.size();
+        for (int i = n-1; i >= 0; i--) {
+            lastFullClassifier = i;
+            if (!partialClassifiers.get(i).isPartial())
+                break;
+        }
+        if(lastFullClassifier > 0)
+            partialClassifiers = partialClassifiers.subList(lastFullClassifier, n);
+        return partialClassifiers;
+    }
+
+    private <T> List<PathDetectionObject> classifyInside(ObjectClassifier<T> classifier, Collection<PathAnnotationObject> annotations, ImageData<T> imageData) throws IncompatibleClassifier {
+        if(!this.isCompatibleClassifier(classifier))
+            throw new IncompatibleClassifier(classifier.getPathClasses(), this.getPathClass(), this.getDiscardedDetectionsPathClass());
         List<PathDetectionObject> cells;
-        if(annotations == null || annotations.isEmpty())
+        if(annotations == null)
             cells = this.getContainersDetections(true); // get ALL detections. Even those there were discarded
         else
             cells = annotations.stream()
                     .flatMap(a -> ChannelDetections.getDetectionsInside(a, this.hierarchy))
                     .filter(detection -> this.hasChannelClass(detection, true))
                     .toList();
-        // if cells is empty, nothing bad should happen
         if (classifier.classifyObjects(imageData, cells, true) > 0)
             imageData.getHierarchy().fireObjectClassificationsChangedEvent(classifier, cells);
         PathClass discardedPC = this.getDiscardedDetectionsPathClass();
@@ -228,7 +256,7 @@ public class ChannelDetections {
             String overlapContainerName = ChannelDetections.getOverlapContainersName(this.id);
             PathAnnotationObject containerParent = (PathAnnotationObject) container.getParent();
             List<PathObject> oldOverlaps = containerParent.getChildObjects().stream()
-                    .filter(o -> channelClass.equals(o.getPathClass()) || overlapContainerName.equals(o.getName()))
+                    .filter(o -> channelClass.equals(o.getPathClass()) && overlapContainerName.equals(o.getName()))
                     .toList();
             hierarchy.removeObjects(oldOverlaps, false);
             PathAnnotationObject overlapsContainer = ChannelDetections.createContainer(containerParent, overlapContainerName, channelClass, this.hierarchy);
@@ -275,6 +303,13 @@ public class ChannelDetections {
 
     public boolean isContainer(PathObject o) {
         return o instanceof PathAnnotationObject && this.getContainersName().equals(o.getName());
+    }
+
+    public boolean isCompatibleClassifier(ObjectClassifier classifier) {
+        Collection<PathClass> outputClasses = classifier.getPathClasses();
+        if(outputClasses.size() != 2)
+            return false;
+        return outputClasses.containsAll(List.of(this.getPathClass(), this.getDiscardedDetectionsPathClass()));
     }
 
     private List<PathDetectionObject> getContainersDetections(boolean all) {
