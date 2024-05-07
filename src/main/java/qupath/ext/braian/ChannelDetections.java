@@ -118,17 +118,28 @@ public class ChannelDetections {
      */
     private static PathAnnotationObject createBasicContainer(PathAnnotationObject annotation, ImageChannelTools ch, PathObjectHierarchy hierarchy) {
         String name = ch.getName();
-        return createContainer(annotation, name, ChannelDetections.getPathClass(name), hierarchy);
+        return createContainer(annotation, ChannelDetections.getBasicContainersName(name), ChannelDetections.getPathClass(name), hierarchy, true);
     }
 
-    private static PathAnnotationObject createContainer(PathAnnotationObject annotation, String name, PathClass classification, PathObjectHierarchy hierarchy) {
-        QP.setSelectedObject(annotation);
+    private static PathAnnotationObject createContainer(PathAnnotationObject containerParent, String name, PathClass classification, PathObjectHierarchy hierarchy, boolean overwrite) {
+        if(overwrite) {
+            Optional<PathAnnotationObject> oldContainer = containerParent.getChildObjects().stream()
+                    .filter(o -> classification.equals(o.getPathClass()) && name.equals(o.getName()) && o instanceof PathAnnotationObject)
+                    .map(o -> (PathAnnotationObject) o)
+                    .findFirst();
+            if (oldContainer.isPresent()) {
+                PathAnnotationObject container = oldContainer.get();
+                hierarchy.removeObjects(container.getChildObjects(), false);
+                return container;
+            }
+        }
+        QP.setSelectedObject(containerParent);
         QP.duplicateSelectedAnnotations();
         PathAnnotationObject duplicate = (PathAnnotationObject) QP.getSelectedObject();
         duplicate.setName(name);
         duplicate.setPathClass(classification);
         BraiAn.populatePathClassGUI(classification);
-        hierarchy.addObjectBelowParent(annotation, duplicate, true);
+        hierarchy.addObjectBelowParent(containerParent, duplicate, true);
         duplicate.setLocked(true);
         return duplicate;
     }
@@ -255,11 +266,7 @@ public class ChannelDetections {
         for (PathAnnotationObject container : this.containers) {
             String overlapContainerName = ChannelDetections.getOverlapContainersName(this.id);
             PathAnnotationObject containerParent = (PathAnnotationObject) container.getParent();
-            List<PathObject> oldOverlaps = containerParent.getChildObjects().stream()
-                    .filter(o -> channelClass.equals(o.getPathClass()) && overlapContainerName.equals(o.getName()))
-                    .toList();
-            hierarchy.removeObjects(oldOverlaps, false);
-            PathAnnotationObject overlapsContainer = ChannelDetections.createContainer(containerParent, overlapContainerName, channelClass, this.hierarchy);
+            PathAnnotationObject overlapsContainer = ChannelDetections.createContainer(containerParent, overlapContainerName, channelClass, this.hierarchy, true);
             ROI containerRoi = overlapsContainer.getROI();
             overlaps.stream()
                     .filter(overlap -> containerRoi.contains(overlap.getROI().getCentroidX(), overlap.getROI().getCentroidY()))
