@@ -12,6 +12,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import static qupath.ext.braian.BraiAnExtension.getLogger;
+
 public class WatershedCellDetectionConfig {
     private String detectionImage;
     private double requestedPixelSizeMicrons = 0.5;
@@ -54,14 +56,16 @@ public class WatershedCellDetectionConfig {
     }
 
     private int findThreshold(ImageChannelTools channel, AutoThresholdParmameters params) {
+        int windowSize = params.getSmoothWindowSize();
         int[] peaks;
         try {
             peaks = channel.getHistogram(params.getResolutionLevel())
-                    .findHistogramPeaks(params.getSmoothWindowSize(), params.getPeakProminence());
+                    .findHistogramPeaks(windowSize, params.getPeakProminence());
         } catch (IOException ignored) {
             throw new RuntimeException("Could not build the channel histogram of '"+detectionImage+"' to automatically determine the threshold!");
         }
-        BraiAnExtension.getLogger().debug("'"+channel.getName()+"' histogram peaks: "+Arrays.toString(peaks));
+        // TODO: should remove the peaks below a certain threhsold. Some images have weird background around the slice
+        getLogger().debug("'"+channel.getName()+"' histogram peaks: "+Arrays.toString(peaks));
         if(peaks.length <= params.getnPeak())
             throw new RuntimeException("Could not automatically determine the channel threshold of '"+detectionImage+"' from its histogram!");
         return peaks[params.getnPeak()];

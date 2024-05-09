@@ -10,6 +10,9 @@ import java.util.*;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 
+import static qupath.ext.braian.BraiAnExtension.getLogger;
+import static qupath.ext.braian.BraiAnExtension.logger;
+
 public class ChannelHistogram {
     private final long[] values;
 
@@ -32,7 +35,7 @@ public class ChannelHistogram {
      * @return an array of the color values
      */
     public int[] findHistogramPeaks() {
-        return findHistogramPeaks(14, 0); // 0.01
+        return findHistogramPeaks(15, 0); // 0.01
     }
 
     /**
@@ -44,6 +47,8 @@ public class ChannelHistogram {
      * @see #zeroPhaseFilter(double[], double[])
      */
     public int[] findHistogramPeaks(int windowSize, double prominence) {
+        if (windowSize%2 == 0)
+            logger.warn("For better results, choose a window of odd size!");
         // movingAvg is a moving average linear digital filter
         double[] movingAvg = new double[windowSize];
         Arrays.fill(movingAvg, (double) 1/windowSize);
