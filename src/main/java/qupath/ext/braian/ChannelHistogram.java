@@ -10,7 +10,6 @@ import java.util.*;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 
-import static qupath.ext.braian.BraiAnExtension.getLogger;
 import static qupath.ext.braian.BraiAnExtension.logger;
 
 public class ChannelHistogram {
@@ -25,6 +24,26 @@ public class ChannelHistogram {
             this.values = Arrays.stream(stats.histogram16).asLongStream().toArray();
         else
             this.values = stats.getHistogram();
+    }
+
+    /**
+     * @return true if the current histogram is built from a 8-bit image
+     */
+    public boolean is8bit() {
+        return this.values.length == 256;
+    }
+
+    /**
+     * @return true if the current histogram is built from a 16-bit image
+     */
+    public boolean is16bit() {
+        return this.values.length == 65536;
+    }
+
+    public int getMaxValue() {
+        if (this.is8bit() || this.is16bit())
+            return this.values.length;
+        throw new RuntimeException("Unknown maximum value for this histogram");
     }
 
     /**
@@ -54,8 +73,9 @@ public class ChannelHistogram {
         Arrays.fill(movingAvg, (double) 1/windowSize);
         double[] hist = Arrays.stream(this.values).asDoubleStream().toArray();
         double[] smoothed = zeroPhaseFilter(movingAvg, hist);
-        double histogramMax = Arrays.stream(smoothed).max().getAsDouble();
-        return findPeaks(smoothed, prominence * histogramMax);
+        return findPeaks(smoothed, prominence);
+        // double histogramMax = Arrays.stream(smoothed).max().getAsDouble();
+        // return findPeaks(smoothed, prominence * histogramMax);
     }
 
     /**

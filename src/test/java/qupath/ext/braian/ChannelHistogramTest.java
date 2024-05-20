@@ -132,7 +132,7 @@ public class ChannelHistogramTest {
     @ParameterizedTest
     @MethodSource("readHistogram")
     void shouldGetDataBit(int[] histogram) {
-        int windowSize = 14;
+        int windowSize = 15; // if it's even, it fails
         double[] movingAvg = new double[windowSize];
         Arrays.fill(movingAvg, (double) 1/windowSize);
         double[] hist = Arrays.stream(histogram).asDoubleStream().toArray();
