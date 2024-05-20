@@ -10,10 +10,10 @@ import qupath.lib.objects.PathAnnotationObject;
 import java.util.Collection;
 
 public class AnnotationClassifier {
-    private final ObjectClassifier classifier;
+    private final ObjectClassifier<?> classifier;
     private final Collection<PathAnnotationObject> annotations;
 
-    public AnnotationClassifier(ObjectClassifier classifier, Collection<PathAnnotationObject> annotations) {
+    public AnnotationClassifier(ObjectClassifier<?> classifier, Collection<PathAnnotationObject> annotations) {
         this.classifier = classifier;
         this.annotations = annotations;
     }
@@ -22,7 +22,7 @@ public class AnnotationClassifier {
         return this.annotations != null;
     }
 
-    public ObjectClassifier getClassifier() {
+    public ObjectClassifier<?> getClassifier() {
         return classifier;
     }
 
