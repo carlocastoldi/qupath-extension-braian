@@ -13,17 +13,24 @@ import java.util.stream.IntStream;
 import static qupath.ext.braian.BraiAnExtension.logger;
 
 public class ChannelHistogram {
+    private final String channelName;
     private final long[] values;
 
     /**
      * Constructs the channel histogram from the {@link ImageStatistics} object
+     * @param channelName the name of the QuPath channel associated to this histogram
      * @param stats the statistics representing a given image channel
      */
-    public ChannelHistogram(ImageStatistics stats) {
+    public ChannelHistogram(String channelName, ImageStatistics stats) {
+        this.channelName = channelName;
         if(stats.histogram16 != null)
             this.values = Arrays.stream(stats.histogram16).asLongStream().toArray();
         else
             this.values = stats.getHistogram();
+    }
+
+    public String getChannelName() {
+        return this.channelName;
     }
 
     /**

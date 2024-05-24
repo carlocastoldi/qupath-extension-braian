@@ -66,7 +66,7 @@ public class ImageChannelTools {
      * @see ImageServer#getDownsampleForResolution(int)
      */
     public ChannelHistogram getHistogram(int resolutionLevel) throws IOException {
-        return new ChannelHistogram(this.getChannelStats(resolutionLevel));
+        return new ChannelHistogram(this.name, this.getChannelStats(resolutionLevel));
     }
 
     /**

@@ -14,6 +14,45 @@ import java.util.stream.IntStream;
 import static qupath.ext.braian.BraiAnExtension.getLogger;
 
 public class WatershedCellDetectionConfig {
+    public static int findThreshold(ImageChannelTools channel, AutoThresholdParmameters params) {
+        int windowSize = params.getSmoothWindowSize();
+        ChannelHistogram histogram;
+        try {
+            histogram = channel.getHistogram(params.getResolutionLevel());
+        } catch (IOException ignored) {
+            throw new RuntimeException("Could not build the channel histogram of '"+channel.getName()+"' to automatically determine the threshold!");
+        }
+        int[] peaks = histogram.findHistogramPeaks(windowSize, params.getPeakProminence());
+        getLogger().debug("'{}' histogram peaks (invalid peaks included): {}", channel.getName(), Arrays.toString(peaks));
+        int threshold =  getNthValidPeak(histogram, peaks, params.getnPeak(), windowSize);
+        getLogger().info("'{}' automatic threshold: {}", channel.getName(), threshold);
+        return threshold;
+        // if(peaks.length <= params.getnPeak())
+        //     throw new RuntimeException("Could not automatically determine the channel threshold of '"+detectionImage+"' from its histogram!");
+        // return peaks[params.getnPeak()];
+    }
+
+    /**
+     * @param histogram
+     * @param peaks
+     * @param nth
+     * @param windowSize
+     * @return the n-th peak of the histogram excluding the peaks that are not trust-worthy (i.e. those at the beginning and end of the smoothed histogram)
+     */
+    private static int getNthValidPeak(ChannelHistogram histogram, int[] peaks, int nth, int windowSize) {
+        int max = histogram.getMaxValue()-windowSize;
+        OptionalInt firstValid = IntStream.range(0, peaks.length).filter(i -> peaks[i] >= windowSize && peaks[i] < max).findFirst();
+        int shiftedNth = nth + firstValid.orElseGet(() -> 0);
+        String msg = "Could not automatically determine the channel threshold of '"+histogram.getChannelName()+"' from its histogram!";
+        if(firstValid.isEmpty())
+            throw new RuntimeException(msg+" No peak was found within the trust-worthy interval");
+        if (peaks.length <= shiftedNth)
+            throw new RuntimeException(msg+" The histogram doesn't have n peaks in [windowSize:end]");
+        if (peaks[shiftedNth] >= max)
+            throw new RuntimeException(msg+" There is at least one valid peak, but not n valid peaks");
+        return peaks[shiftedNth];
+    }
+
     private String detectionImage = null; // it is not meant to be in the config file. It will stay null until build() is called
     private double requestedPixelSizeMicrons = 0.5;
     private double backgroundRadiusMicrons = 8.0;
@@ -52,45 +91,6 @@ public class WatershedCellDetectionConfig {
                             return map1;
                         }
                 );
-    }
-
-    private int findThreshold(ImageChannelTools channel, AutoThresholdParmameters params) {
-        int windowSize = params.getSmoothWindowSize();
-        ChannelHistogram histogram;
-        try {
-            histogram = channel.getHistogram(params.getResolutionLevel());
-        } catch (IOException ignored) {
-            throw new RuntimeException("Could not build the channel histogram of '"+detectionImage+"' to automatically determine the threshold!");
-        }
-        int[] peaks = histogram.findHistogramPeaks(windowSize, params.getPeakProminence());
-        getLogger().debug("'{}' histogram peaks (invalid peaks included): {}", channel.getName(), Arrays.toString(peaks));
-        int threshold =  getNthValidPeak(histogram, peaks, params.getnPeak(), windowSize);
-        getLogger().info("'{}' automatic threshold: {}", channel.getName(), threshold);
-        return threshold;
-        // if(peaks.length <= params.getnPeak())
-        //     throw new RuntimeException("Could not automatically determine the channel threshold of '"+detectionImage+"' from its histogram!");
-        // return peaks[params.getnPeak()];
-    }
-
-    /**
-     * @param histogram
-     * @param peaks
-     * @param nth
-     * @param windowSize
-     * @return the n-th peak of the histogram excluding the peaks that are not trust-worthy (i.e. those at the beginning and end of the smoothed histogram)
-     */
-    private int getNthValidPeak(ChannelHistogram histogram, int[] peaks, int nth, int windowSize) {
-        int max = histogram.getMaxValue()-windowSize;
-        OptionalInt firstValid = IntStream.range(0, peaks.length).filter(i -> peaks[i] >= windowSize && peaks[i] < max).findFirst();
-        int shiftedNth = nth + firstValid.orElseGet(() -> 0);
-        String msg = "Could not automatically determine the channel threshold of '"+detectionImage+"' from its histogram!";
-        if(firstValid.isEmpty())
-            throw new RuntimeException(msg+" No peak was found within the trust-worthy interval");
-        if (peaks.length <= shiftedNth)
-            throw new RuntimeException(msg+" The histogram doesn't have n peaks in [windowSize:end]");
-        if (peaks[shiftedNth] >= max)
-            throw new RuntimeException(msg+" There is at least one valid peak, but not n valid peaks");
-        return peaks[shiftedNth];
     }
 
     public String getDetectionImage() {
