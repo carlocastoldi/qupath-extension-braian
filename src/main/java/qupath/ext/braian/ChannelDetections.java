@@ -55,7 +55,7 @@ public class ChannelDetections extends AbstractDetections {
             PathAnnotationObject fullImage = ChannelDetections.getFullImageDetectionAnnotation(hierarchy);
             annotations = List.of(fullImage);
         }
-        Map<String, ?> params = config.toParameters(channel);
+        Map<String, ?> params = config.build(channel);
         // TODO: check if the given annotations overlap. If they do, throw an error as that would duplicate detections
         List<PathAnnotationObject> containers = annotations.stream().map(annotation -> {
             annotation.setLocked(true);

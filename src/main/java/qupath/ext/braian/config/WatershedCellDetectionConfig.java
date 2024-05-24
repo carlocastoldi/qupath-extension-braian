@@ -4,7 +4,6 @@
 
 package qupath.ext.braian.config;
 
-import qupath.ext.braian.BraiAnExtension;
 import qupath.ext.braian.ChannelHistogram;
 import qupath.ext.braian.ImageChannelTools;
 
@@ -15,7 +14,7 @@ import java.util.stream.IntStream;
 import static qupath.ext.braian.BraiAnExtension.getLogger;
 
 public class WatershedCellDetectionConfig {
-    private String detectionImage;
+    private String detectionImage = null; // it is not meant to be in the config file. It will stay null until build() is called
     private double requestedPixelSizeMicrons = 0.5;
     private double backgroundRadiusMicrons = 8.0;
     private boolean backgroundByReconstruction = true; // new from QuPath 0.4.0. Before it was always set to "true"
@@ -31,7 +30,7 @@ public class WatershedCellDetectionConfig {
     private boolean smoothBoundaries = true;
     private boolean makeMeasurements = true;
 
-    public Map<String,?> toParameters(ImageChannelTools channel) {
+    public Map<String,?> build(ImageChannelTools channel) {
         this.setDetectionImage(channel.getName());
         if (this.histogramThreshold != null)
             this.setThreshold(findThreshold(channel, this.histogramThreshold));

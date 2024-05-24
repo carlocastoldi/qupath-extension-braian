@@ -13,7 +13,6 @@ import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectTools;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
-import qupath.lib.scripting.QP;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -179,8 +178,8 @@ public abstract class AbstractDetections {
         classifiers = removeUselessClassifiers(classifiers);
         List<PathDetectionObject> cells = new ArrayList<>();
         for (PartialClassifier partialClassifier: classifiers) {
-            ObjectClassifier classifier = partialClassifier.getClassifier();
-            Collection<PathAnnotationObject> toClassify = partialClassifier.getAnnotations();
+            ObjectClassifier classifier = partialClassifier.classifier();
+            Collection<PathAnnotationObject> toClassify = partialClassifier.annotations();
             try {
                 cells.addAll(this.classifyInside(classifier, toClassify, imageData));
             } catch (IncompatibleClassifier e) {

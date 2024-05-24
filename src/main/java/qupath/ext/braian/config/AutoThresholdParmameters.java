@@ -6,8 +6,8 @@ package qupath.ext.braian.config;
 
 public class AutoThresholdParmameters {
     private int resolutionLevel = 4;
-    private int smoothWindowSize = 14;
-    private double peakProminence = 0.01;
+    private int smoothWindowSize = 15;
+    private double peakProminence = 100;
     private int nPeak = 1;
 
     public int getResolutionLevel() {

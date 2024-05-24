@@ -19,12 +19,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 public class ProjectsConfigFile {
     public static ProjectsConfigFile read(String yamlFileName) throws IOException {
         Path filePath = BraiAn.resolvePath(yamlFileName);
-        BraiAnExtension.getLogger().info("using '"+filePath+"' configuration file.");
+        BraiAnExtension.getLogger().info("using '{}' configuration file.", filePath);
         String configStream = Files.readString(filePath, StandardCharsets.UTF_8);
 
         try {
@@ -37,9 +37,9 @@ public class ProjectsConfigFile {
         }
     }
 
-    private String classForDetections;
-    private Map<String,?> detectionsCheck = Map.of("apply", false);
-    private List<ChannelDetectionsConfig> channelDetections;
+    private String classForDetections = null;
+    private DetectionsCheckConfig detectionsCheck = new DetectionsCheckConfig();
+    private List<ChannelDetectionsConfig> channelDetections = List.of();
 
     public String getClassForDetections() {
         return classForDetections;
@@ -61,12 +61,21 @@ public class ProjectsConfigFile {
         this.classForDetections = classForDetections;
     }
 
-    public Map<String,?> getDetectionsCheck() {
+    public DetectionsCheckConfig getDetectionsCheck() {
         return detectionsCheck;
     }
 
-    public void setDetectionsCheck(Map<String,?> detectionsCheck) {
+    public void setDetectionsCheck(DetectionsCheckConfig detectionsCheck) {
         this.detectionsCheck = detectionsCheck;
+    }
+
+    public Optional<String> getControlChannel() {
+        if (!this.detectionsCheck.getApply() || this.channelDetections.size() < 2) // if there is only one channel with detections, it is useless to have a controlChannel
+            return Optional.empty();
+        String name = this.detectionsCheck.getControlChannel();
+        if (name == null)
+            name =  this.channelDetections.get(0).getName();
+        return Optional.of(name);
     }
 
     public List<ChannelDetectionsConfig> getChannelDetections() {
