@@ -34,12 +34,6 @@ var hierarchy = imageData.getHierarchy()
 var config = ProjectsConfigFile.read("BraiAn.yml")
 var annotations = config.getAnnotationsForDetections(hierarchy)
 
-// MAKE DETECTION PARAMETERS CONCRETE
-config.channelDetections.forEach {detectionsConf ->
-    var channel = new ImageChannelTools(detectionsConf.name, server)
-    println detectionsConf.parameters.build(channel)
-}
-
 // COMPUTE CHANNEL DETECTIONS
 var allDetections = config.channelDetections.collect { detectionsConf ->
     var channel = new ImageChannelTools(detectionsConf.name, server)
