@@ -12,16 +12,10 @@ import qupath.imagej.tools.IJTools;
 import qupath.lib.images.PathImage;
 import qupath.lib.images.servers.ImageChannel;
 import qupath.lib.images.servers.ImageServer;
-import qupath.lib.objects.PathAnnotationObject;
-import qupath.lib.objects.PathDetectionObject;
-import qupath.lib.objects.PathObject;
-import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.regions.RegionRequest;
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.*;
 
 class IllegalChannelName extends RuntimeException {
     public IllegalChannelName(String name) {

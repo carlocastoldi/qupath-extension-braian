@@ -4,7 +4,7 @@
 
 package qupath.ext.braian.config;
 
-import qupath.ext.braian.AnnotationClassifier;
+import qupath.ext.braian.PartialClassifier;
 import qupath.ext.braian.utils.BraiAn;
 import qupath.lib.classifiers.object.ObjectClassifier;
 import qupath.lib.classifiers.object.ObjectClassifiers;
@@ -13,7 +13,6 @@ import qupath.lib.io.UriUpdater;
 import qupath.lib.objects.PathAnnotationObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -70,7 +69,7 @@ public class ChannelClassifierConfig {
                 .toList();
     }
 
-    public AnnotationClassifier toAnnotationClassifier(PathObjectHierarchy hierarchy) throws IOException {
-        return new AnnotationClassifier(this.loadClassifier(), this.getAnnotationsToClassify(hierarchy));
+    public PartialClassifier toPartialClassifier(PathObjectHierarchy hierarchy) throws IOException {
+        return new PartialClassifier(this.loadClassifier(), this.getAnnotationsToClassify(hierarchy));
     }
 }

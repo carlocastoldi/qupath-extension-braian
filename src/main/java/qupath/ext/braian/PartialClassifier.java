@@ -9,17 +9,17 @@ import qupath.lib.objects.PathAnnotationObject;
 
 import java.util.Collection;
 
-public class AnnotationClassifier {
+public class PartialClassifier {
     private final ObjectClassifier<?> classifier;
     private final Collection<PathAnnotationObject> annotations;
 
-    public AnnotationClassifier(ObjectClassifier<?> classifier, Collection<PathAnnotationObject> annotations) {
+    public PartialClassifier(ObjectClassifier<?> classifier, Collection<PathAnnotationObject> annotations) {
         this.classifier = classifier;
         this.annotations = annotations;
     }
 
-    public boolean isPartial() {
-        return this.annotations != null;
+    public boolean coversFullImage() {
+        return this.annotations == null;
     }
 
     public ObjectClassifier<?> getClassifier() {

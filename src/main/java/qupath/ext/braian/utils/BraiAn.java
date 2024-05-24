@@ -5,20 +5,16 @@
 package qupath.ext.braian.utils;
 
 import qupath.fx.utils.FXUtils;
-import qupath.lib.classifiers.object.ObjectClassifier;
-import qupath.lib.classifiers.object.ObjectClassifiers;
 import qupath.lib.gui.QuPathGUI;
-import qupath.lib.io.UriResource;
-import qupath.lib.io.UriUpdater;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.projects.Projects;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import static qupath.lib.scripting.QP.getProject;
@@ -47,5 +43,18 @@ public class BraiAn {
             FXUtils.runOnApplicationThread(() ->
                 qupathGUI.getAvailablePathClasses().setAll(visibleClasses)
             );
+    }
+
+    public static <T> String join(Collection<T> c, String delimiter) {
+        if (c.isEmpty())
+            return "";
+        StringBuilder classesStr = new StringBuilder();
+        List<T> l = c instanceof List ? (List<T>) c : new ArrayList<>(c);
+        for (int i = 0; i < l.size()-1; i++) {
+            T o = l.get(i);
+            classesStr.append(o).append(delimiter);
+        }
+        classesStr.append(l.get(l.size()-1));
+        return classesStr.toString();
     }
 }
