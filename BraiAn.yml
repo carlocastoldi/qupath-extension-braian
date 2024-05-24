@@ -1,0 +1,109 @@
+# SPDX-FileCopyrightText: 2024 Carlo Castoldi <carlo.castoldi@outlook.com>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# This is a configuration file for BraiAn, a QuPath extension for managing multiple projects with the same parameters
+# It is meant to be placed either in a QuPath project folder, or in its parent directory.
+# Ideally, the parent directory contains multiple QP projects for which the same parameteres are used in the analysis.
+# If a value is not defined in the YAML, BraiAn will apply a default value.
+classForDetections: null                  # DEFAULT: null (i.e. applies BraiAn on the whole image)
+                                          #               Class of the annotations in which BraiAn's cell detection analysis is desired
+detectionsCheck:
+  apply: true                             # DEFAULT: false
+                                          #               If set to true, each detection on a channel (different from 'controlChannel') is ascribable to a cell detection in the 'controlChannel'.
+                                          #               It finds detections in 'controlChannel' that contains the detections' centroid of remaining channels
+                                          #               It is useful only when 'channelDetections' has more than one value
+  controlChannel: "AF568"                 # DEFAULT: first of channelDetectionsChannel
+                                          #               Image channel whose detections are used to apply the check. Usually it is "DAPI".
+                                          #               If used to compute overlaps between two markers, select a channel whose marker is cytoplasmic rather than nuclear (has larger detections)
+
+# Cell detection parameters for each color channel
+channelDetections:                        # DEFAULT: empty (i.e. BraiAn does not work on any imagge channel)
+  # - name: "DAPI"                        # if no parameters are defined for one channel, BraiAn will use QuPath's default values
+  - name: "AF568" # cFos
+    parameters:
+      requestedPixelSizeMicrons: 1        # DEFAULT: 0.5
+                                          #               Choose pixel size at which detection will be performed - higher values are likely to be faster, but may be less accurate;
+                                          #               set <= 0 to use the full image resolution
+      # Nucleus parameters
+      backgroundRadiusMicrons: 10         # DEFAULT: 8.0
+                                          #               Radius for background estimation, should be > the largest nucleus radius, or <= 0 to turn off background subtraction
+      backgroundByReconstruction: true    # DEFAULT: true
+                                          #               Use opening-by-reconstruction for background estimation (default is 'true').
+                                          #               "Opening by reconstruction tends to give a 'better' background estimate, because it incorporates more information across
+                                          #               the image tile used for cell detection.
+                                          #               *However*, in some cases (e.g. images with prominent folds, background staining, or other artefacts)
+                                          #               this can cause problems, with the background estimate varying substantially between tiles.
+                                          #               Opening by reconstruction was always used in QuPath before v0.4.0, but now it is optional.
+      medianRadiusMicrons: 0.0            # DEFAULT: 0.0
+                                          #               Radius of median filter used to reduce image texture (optional)
+      sigmaMicrons: 1.5                   # DEFAULT: 1.5
+                                          #               Sigma value for Gaussian filter used to reduce noise; increasing the value stops nuclei being fragmented, but may reduce the accuracy of boundaries
+      minAreaMicrons: 20.0                # DEFAULT: 10.0
+                                          #               Detected nuclei with an area < minimum area will be discarded
+      maxAreaMicrons: 1000.0              # DEFAULT: 400.0
+                                          #               Detected nuclei with an area > maximum area will be discarded
+      # Intensity parameters
+      # threshold: -1                     # DEFAULT: 100
+                                          #               Intensity threshold - detected nuclei must have a mean intensity >= threshold
+      histogramThreshold:                 # if 'histogramThreshold' parameter is specified, it will ignore 'threshold' and try to automatically compute one based on the image histogram
+        resolutionLevel: 4                # DEFAULT: 4
+                                          #               resolution level at which the histogram is computed
+        smoothWindowSize: 15              # DEFAULT: 15
+                                          #               size of the window used by the moving average to smooth the histogram
+        peakProminence: 100               # DEFAULT: 100
+                                          #               amount of prominence from the surrounding values in the histogram for a local maximum to be considered a 'peak'
+        nPeak: 1                          # DEFAULT: 1
+                                          #               n-th peak to use as threshold (starts from 1)
+      watershedPostProcess: true          # DEFAULT: true
+                                          #               Split merged detected nuclei based on shape ('roundness')
+      # Cell parameters
+      cellExpansionMicrons: 5.0           # DEFAULT: 5.0
+                                          #               Amount by which to expand detected nuclei to approximate the full cell area
+      includeNuclei: true                 # DEFAULT: false
+                                          #               If cell expansion is used, optionally include/exclude the nuclei within the detected cells
+      # General parameters
+      smoothBoundaries: true              # DEFAULT: true
+                                          #               Smooth the detected nucleus/cell boundaries
+      makeMeasurements: true              # DEFAULT: true
+                                          #               Add default shape & intensity measurements during detection
+    classifiers:                          # DEFAULT empty (i.e. no classifier is applied)
+                                          #               A list of classifiers to apply in sequence to the channel's detections
+                                          #               The order of the classifier is important. If they work on overlapping annotations, the intersection is classified using the latter classifier
+      - name: "AF568_cFos_classifier"     # DEFAULT: null
+                                          #               name of the classifier's json file to use on this channel detections
+                                          #               Contrary to what QuPath does by default, BraiAn searches it in the project's directory or in its parent directory
+        annotationsToClassify:            # DEFAULT: empty (i.e. the classifier is applied on all detections)
+                                          #               List of the annotation names for which the classifier is applied
+  - name: "AF647" # Arc1
+    parameters:
+      requestedPixelSizeMicrons: 1
+      # Nucleus parameters
+      backgroundRadiusMicrons: 20
+      backgroundByReconstruction: true
+      medianRadiusMicrons: 0.0
+      sigmaMicrons: 1.5
+      minAreaMicrons: 40.0
+      maxAreaMicrons: 1000.0
+      # Intensity parameters
+      # threshold: -1
+      histogramThreshold:
+        resolutionLevel: 4
+        smoothWindowSize: 15
+        peakProminence: 100
+        nPeak: 1
+      watershedPostProcess: true
+      # Cell parameters
+      cellExpansionMicrons: 5.0
+      includeNuclei: true
+      # General parameters
+      smoothBoundaries: true
+      makeMeasurements: true
+    classifiers:
+      - name: "AF647_Arc1_subcortical_classifier"
+      - name: "AF647_Arc1_isocortex_classifier"
+        annotationsToClassify:
+          - "Isocortex"
+          - "CTXsp"
+          - "OLF"
+          - "CA1"
