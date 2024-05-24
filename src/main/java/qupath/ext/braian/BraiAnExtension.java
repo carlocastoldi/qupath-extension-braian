@@ -12,7 +12,11 @@ import qupath.lib.gui.extensions.QuPathExtension;
 
 public class BraiAnExtension implements QuPathExtension, GitHubProject {
 
-    private static final Logger logger = LoggerFactory.getLogger(BraiAnExtension.class);
+    static final Logger logger = LoggerFactory.getLogger(BraiAnExtension.class);
+
+    public static Logger getLogger() {
+        return logger;
+    }
 
     @Override
     public GitHubRepo getRepository() {

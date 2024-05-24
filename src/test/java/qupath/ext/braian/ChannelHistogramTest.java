@@ -6,13 +6,19 @@ package qupath.ext.braian;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.*;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -123,4 +129,47 @@ public class ChannelHistogramTest {
         assertArrayEquals(cleanSignal, cleanedSignal, 0.1);
     }
 
+    @ParameterizedTest
+    @MethodSource("readHistogram")
+    void shouldGetDataBit(int[] histogram) {
+        int windowSize = 15; // if it's even, it fails
+        double[] movingAvg = new double[windowSize];
+        Arrays.fill(movingAvg, (double) 1/windowSize);
+        double[] hist = Arrays.stream(histogram).asDoubleStream().toArray();
+        double[] smoothed = ChannelHistogram.zeroPhaseFilter(movingAvg, hist);
+
+        // System.out.println(histogram);
+        assertEquals(hist.length, smoothed.length);
+    }
+
+    static Stream<Arguments> readHistogram() {
+        try {
+            return Stream.of(
+                    Arguments.of(readIntArrayFromFile("/histogram1.txt"))
+            );
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static int[] readIntArrayFromFile(String fileName) throws IOException {
+        List<Integer> list = new ArrayList<>();
+        String line;
+        InputStream inputStream = ChannelHistogramTest.class.getResourceAsStream(fileName);
+        assert inputStream != null;
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+        // BufferedReader reader = new BufferedReader(new FileReader(filePath));
+        while ((line = reader.readLine()) != null)
+            list.add(Integer.parseInt(line.trim()));
+        return list.stream().mapToInt(i -> i).toArray();
+    }
+
 }
+
+// python3
+/*
+from scipy.signal import filtfilt
+from scipy.signal import find_peaks
+x_ = filtfilt(np.ones(14) / 14, 1, x)
+find_peaks(x_, prominence=180)[0]
+*/

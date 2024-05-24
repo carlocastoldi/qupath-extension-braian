@@ -27,7 +27,8 @@ dependencies {
     shadow "io.github.qupath:qupath-gui-fx:$qupathVersion"
     shadow libs.slf4j
     // For JavaFX
-    // shadow libs.qupath.fxtras
+    shadow libs.qupath.fxtras
+    shadow libs.snakeyaml
 
     testImplementation "io.github.qupath:qupath-gui-fx:$qupathVersion" // repeat dependency, since it was shadowed
     testImplementation libs.junit

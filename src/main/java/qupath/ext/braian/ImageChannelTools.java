@@ -12,20 +12,20 @@ import qupath.imagej.tools.IJTools;
 import qupath.lib.images.PathImage;
 import qupath.lib.images.servers.ImageChannel;
 import qupath.lib.images.servers.ImageServer;
+import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.regions.RegionRequest;
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 
 class IllegalChannelName extends RuntimeException {
     public IllegalChannelName(String name) {
-        super(String.format("Cannot find a channel named '{}'!", name));
+        super(String.format("Cannot find a channel named '"+name+"'!"));
     }
 }
 
 public class ImageChannelTools {
     private final String name;
-    private final ImageServer<BufferedImage> server;
+    private final ImageServer server;
     private final int nChannel;
 
     /**
@@ -33,7 +33,7 @@ public class ImageChannelTools {
      * @param name name of the channel
      * @param server image server to which the channel is referring to
      */
-    public ImageChannelTools(String name, ImageServer<BufferedImage> server) {
+    public <T> ImageChannelTools(String name, ImageServer<T> server) {
         this.name = name;
         this.server = server;
         this.nChannel = this.findNChannel();
@@ -78,7 +78,7 @@ public class ImageChannelTools {
      * @see #getChannelStats(int)
      * @see ImageServer#getDownsampleForResolution(int)
      */
-    private ImageStatistics getChannelStats(int resolutionLevel) throws IOException {
+    public ImageStatistics getChannelStats(int resolutionLevel) throws IOException {
         double downsample = this.server.getDownsampleForResolution(Math.min(this.server.nResolutions()-1, resolutionLevel));
         RegionRequest request = RegionRequest.createInstance(this.server, downsample);
         PathImage<ImagePlus> pathImage = IJTools.convertToImagePlus(this.server, request);
@@ -91,5 +91,13 @@ public class ImageChannelTools {
         ip.resetRoi();
         ImageStatistics stats = ip.getStats();
         return stats;
+    }
+
+    public String getName() {
+        return this.name;
+    }
+
+    public ChannelDetections getDetections(PathObjectHierarchy hierarchy) {
+        return new ChannelDetections(this, hierarchy);
     }
 }
