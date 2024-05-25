@@ -10,6 +10,8 @@ on:
 jobs:
   jpackage:
     name: Java CI/CD
+    permissions:
+      contents: write
     uses: ./.github/workflows/jpackage.yml
 
   release:
@@ -26,6 +28,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build
+          path: build/
 
       - name: Release
         env:

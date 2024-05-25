@@ -15,7 +15,7 @@ plugins {
 ext.moduleName = "qupath.extension.braian"
 base {
     archivesName = rootProject.name
-    version = "1.0.0-SNAPSHOT"
+    version = "1.0.0"
     description = "QuPath extension for whole-brain data extraction"
 }
 ext.qupathVersion = gradle.ext.qupathVersion
@@ -33,6 +33,8 @@ dependencies {
     testImplementation "io.github.qupath:qupath-gui-fx:$qupathVersion" // repeat dependency, since it was shadowed
     testImplementation libs.junit
     testImplementation "org.mockito:mockito-core:5.+"
+
+    testRuntimeOnly libs.junit.platform
 }
 
 jar {
