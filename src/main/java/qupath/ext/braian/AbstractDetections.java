@@ -76,6 +76,7 @@ public abstract class AbstractDetections {
         this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
     }
 
+    // TODO: allow to search for containers WITHIN a list of given annotations (useful with 'classForDetections' from ProjectsConfig)
     private List<PathAnnotationObject> searchContainers() {
         return this.hierarchy.getAnnotationObjects().stream()
                 .filter(this::isContainer)

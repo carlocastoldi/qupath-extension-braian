@@ -15,6 +15,7 @@ import qupath.lib.images.servers.ImageServer;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.regions.RegionRequest;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 
 class IllegalChannelName extends RuntimeException {
@@ -25,7 +26,7 @@ class IllegalChannelName extends RuntimeException {
 
 public class ImageChannelTools {
     private final String name;
-    private final ImageServer server;
+    private final ImageServer<BufferedImage> server;
     private final int nChannel;
 
     /**
@@ -33,7 +34,7 @@ public class ImageChannelTools {
      * @param name name of the channel
      * @param server image server to which the channel is referring to
      */
-    public <T> ImageChannelTools(String name, ImageServer<T> server) {
+    public ImageChannelTools(String name, ImageServer<BufferedImage> server) {
         this.name = name;
         this.server = server;
         this.nChannel = this.findNChannel();
