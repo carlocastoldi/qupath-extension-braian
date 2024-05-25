@@ -17,13 +17,17 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * This class allows to compute and manage double/triple/multiple positive detections.
+ * It does so by leveraging {@link AbstractDetections} interface
+ */
 public class OverlappingDetections extends AbstractDetections {
-    private static final String OVERLAP_DELIMITER = "~";
+    public static final String OVERLAP_DELIMITER = "~";
 
     /**
      * Creates all the names of the possible overlaps between the given PathClasses names
      * @param primitiveClasses a list of PathClasses names
-     * @return a list combinations of the given primitiveClasses, delimited by ChannelDetections.OVERLAP_DELIMITER
+     * @return a list combinations of the given primitiveClasses, delimited by {@link OverlappingDetections#OVERLAP_DELIMITER}
      */
     public static List<String> createAllOverlappingClassNames(List<String> primitiveClasses) {
         if(primitiveClasses.isEmpty())
@@ -44,7 +48,8 @@ public class OverlappingDetections extends AbstractDetections {
                 .collect(Collectors.joining(OverlappingDetections.OVERLAP_DELIMITER));
     }
 
-    private static Collection<PathClass> getAllPossibleOverlappingClassifications(AbstractDetections control, Collection<AbstractDetections> otherDetections) {
+    private static Collection<PathClass> getAllPossibleOverlappingClassifications(AbstractDetections control,
+                                                                                  Collection<AbstractDetections> otherDetections) {
         return OverlappingDetections.createAllOverlappingClassNames(
                         otherDetections.stream().map(AbstractDetections::getId).toList())
                 .stream()
@@ -53,7 +58,18 @@ public class OverlappingDetections extends AbstractDetections {
                 .toList();
     }
 
-    public OverlappingDetections(AbstractDetections control, Collection<AbstractDetections> others, boolean compute, PathObjectHierarchy hierarchy) {
+    /**
+     * Creates an instance of overlapping detections
+     * @param control the detections used to check whether the other detections are overlapping between them and the control
+     * @param others the other detections
+     * @param compute if true, it will delete any previous overlap and compute the overlap between detections.
+     *                If false, it will try to retrieve pre-computed ovarlappings
+     * @param hierarchy where to find/compute the overlapping detections
+     * @throws NoCellContainersFoundException if no pre-computed overlappings were found in the given hierarchy
+     */
+    public OverlappingDetections(AbstractDetections control,
+                                 Collection<AbstractDetections> others,
+                                 boolean compute, PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
         super(control.getId(), getAllPossibleOverlappingClassifications(control, others), hierarchy);
         if (!compute)
             return;
@@ -61,7 +77,16 @@ public class OverlappingDetections extends AbstractDetections {
         this.fireUpdate();
     }
 
-    public OverlappingDetections(AbstractDetections control, Collection<AbstractDetections> others, PathObjectHierarchy hierarchy) {
+    /**
+     * Creates an instance based on pre-computed overlapping detections
+     * @param control the detections used to check whether the other detections are overlapping between them and the control
+     * @param others the other detections
+     * @param hierarchy where to find the overlapping detections
+     * @throws NoCellContainersFoundException if no pre-computed overlappings were found in the given hierarchy
+     */
+    public OverlappingDetections(AbstractDetections control,
+                                 Collection<AbstractDetections> others,
+                                 PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
         this(control, others, false, hierarchy);
     }
 

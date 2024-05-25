@@ -13,9 +13,18 @@ import qupath.lib.scripting.QP;
 
 import java.util.*;
 
+/**
+ * This class allows to manage detections computed with {@link qupath.imagej.detect.cells.WatershedCellDetection}
+ * on a given image channel. It does so by leveraging {@link AbstractDetections} interface
+ */
 public class ChannelDetections extends AbstractDetections {
-    private static final String FULL_IMAGE_DETECTIONS_NAME = "AllDetections";
+    public static final String FULL_IMAGE_DETECTIONS_NAME = "AllDetections";
 
+    /**
+     * Returns the annotation used when working with detections on the whole image
+     * @param hierarchy where to find/compute the detections
+     * @return the full image detection named as {@link ChannelDetections#FULL_IMAGE_DETECTIONS_NAME}
+     */
     public static PathAnnotationObject getFullImageDetectionAnnotation(PathObjectHierarchy hierarchy) {
         List<PathObject> fullImageAnnotations = hierarchy.getAnnotationObjects().stream()
                 .filter(a -> FULL_IMAGE_DETECTIONS_NAME.equals(a.getName())).toList();
@@ -31,23 +40,43 @@ public class ChannelDetections extends AbstractDetections {
         }
     }
 
-    public ChannelDetections(String id, PathObjectHierarchy hierarchy) {
-        super(id, List.of(PathClass.fromString(id)), hierarchy);
+    /**
+     * Creates an instance based on pre-computed cell detections
+     * @param channelName the name of the channel to which the detections are linked to
+     * @param hierarchy where to find the detections
+     * @throws NoCellContainersFoundException if no pre-computed detection was found in the given hierarchy
+     * @see #getContainersName()
+     * @see AbstractDetections
+     */
+    public ChannelDetections(String channelName, PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
+        super(channelName, List.of(PathClass.fromString(channelName)), hierarchy);
     }
 
-    public ChannelDetections(ImageChannelTools channel, PathObjectHierarchy hierarchy) {
+    /**
+     * Creates an instance based on pre-computed cell detections
+     * @param channel the channel to which the detections are linked to
+     * @param hierarchy where to find the detections
+     * @throws NoCellContainersFoundException if no pre-computed detection was found in the given hierarchy
+     * @see #getContainersName()
+     * @see AbstractDetections
+     */
+    public ChannelDetections(ImageChannelTools channel, PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
         this(channel.getName(), hierarchy);
     }
 
     /**
-     * Computes the detections in "annotation".
-     * @param channel
-     * @param annotations
-     * @param config
-     * @param hierarchy
-     * @return
+     * Computes the detections using {@link qupath.imagej.detect.cells.WatershedCellDetection} algorithm inside the given annotations
+     * @param channel the channel to which the detections are linked to
+     * @param annotations the annotations inside of which to compute the detections. If null or empty, it will compute them on the whole image
+     * @param config parameters to give to the {@link qupath.imagej.detect.cells.WatershedCellDetection}
+     * @param hierarchy where to compute the detections
+     * @throws NoCellContainersFoundException
+     * @see #getFullImageDetectionAnnotation(PathObjectHierarchy)
      */
-    public ChannelDetections(ImageChannelTools channel, Collection<PathAnnotationObject> annotations, WatershedCellDetectionConfig config, PathObjectHierarchy hierarchy) {
+    public ChannelDetections(ImageChannelTools channel,
+                             Collection<PathAnnotationObject> annotations,
+                             WatershedCellDetectionConfig config,
+                             PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
         this(channel, hierarchy);
 
         if(annotations == null || annotations.isEmpty()) {
@@ -66,7 +95,19 @@ public class ChannelDetections extends AbstractDetections {
         this.fireUpdate();
     }
 
-    public ChannelDetections(ImageChannelTools channel, PathAnnotationObject annotation, WatershedCellDetectionConfig config, PathObjectHierarchy hierarchy) {
+    /**
+     * Computes the detections using {@link qupath.imagej.detect.cells.WatershedCellDetection} algorithm inside the given annotations
+     * @param channel the channel to which the detections are linked to
+     * @param annotation the annotation inside of which to compute the detections. If null, it will compute them on the whole image
+     * @param config parameters to give to the {@link qupath.imagej.detect.cells.WatershedCellDetection}
+     * @param hierarchy where to compute the detections
+     * @throws NoCellContainersFoundException
+     * @see #getFullImageDetectionAnnotation(PathObjectHierarchy)
+     */
+    public ChannelDetections(ImageChannelTools channel,
+                             PathAnnotationObject annotation,
+                             WatershedCellDetectionConfig config,
+                             PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
         this(channel, annotation != null ? List.of(annotation) : null, config, hierarchy);
     }
 

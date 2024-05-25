@@ -212,6 +212,9 @@ public class BoundingBoxHierarchy implements BoundingBox {
         return Optional.of(getClosestOverlap(overlaps, object));
     }
 
+    /**
+     * @return true if there are no {@link PathObject} inside
+     */
     public boolean isEmpty() {
         // if the bbox is empty, it could still mean that there is one object with PointsROI or something similar
         return this.children.isEmpty();

@@ -20,20 +20,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-class EmptyDetectionsException extends RuntimeException {
-    public EmptyDetectionsException(Class<? extends AbstractDetections> clazz) {
-        super("No '"+clazz.getSimpleName()+" was pre-computed in the given image.");
-    }
-}
-
-class IncompatibleClassifier extends Exception {
-    public IncompatibleClassifier(Collection<PathClass> classifierOutputs, List<PathClass> detectionClasses, PathClass discardedChannelClass) {
-        super("The provided classifier is incompatibile.\n" +
-                "Expected: ["+BraiAn.join(detectionClasses, ", ")+", "+discardedChannelClass+"]\n" +
-                "Got: "+classifierOutputs.toString());
-    }
-}
-
 /**
  * This abstract class defines the interface to handle groups of different cell detections groups.
  * It works by using on "container" annotations, in which all the cells are grouped inside.
@@ -67,12 +53,16 @@ public abstract class AbstractDetections {
     private BoundingBoxHierarchy bbh;
 
     /**
-     * Constructs an object that groups together detections of the same kind
+     * Constructs an object that groups together detections of the same kind.
+     * To do so, it searches for container annotations of detections having a name compatible with {@link #getContainersName()}
      * @param id identification of this group of detections
      * @param detectionClasses classifications used to identify the detections
      * @param hierarchy where to find the detections
+     * @throws NoCellContainersFoundException if there is no compatible container in the hierarchy
+     * @see #getContainersName()
+     * @see #getContainersPathClass()
      */
-    public AbstractDetections(String id, Collection<PathClass> detectionClasses, PathObjectHierarchy hierarchy) {
+    public AbstractDetections(String id, Collection<PathClass> detectionClasses, PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
         this.hierarchy = hierarchy;
         this.id = id;
         this.detectionClasses = detectionClasses.stream().toList();
@@ -82,10 +72,11 @@ public abstract class AbstractDetections {
     /**
      * used to update the internal representation to the current state.
      * If container annotations or detections are touched outside of BraiAn, it's better to call this method.
+     * @throws NoCellContainersFoundException if there is no compatible container in the hierarchy
      */
-    public void fireUpdate() {
+    public void fireUpdate() throws NoCellContainersFoundException {
         this.containers = this.searchContainers();
-        List<PathDetectionObject> cells = this.getContainersDetections(false);
+        List<PathDetectionObject> cells = this.getContainersDetections(false); // throw NoCellContainersFoundException
         this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
     }
 
@@ -181,9 +172,12 @@ public abstract class AbstractDetections {
         return o.isDetection() && this.hasDetectionClass(o, all);
     }
 
-    private List<PathDetectionObject> getContainersDetections(boolean all) {
-        if(containers.isEmpty())
-            throw new EmptyDetectionsException(this.getClass());
+    /**
+     * returns the list of detections of this instance found only in the containers
+     */
+    private List<PathDetectionObject> getContainersDetections(boolean all) throws NoCellContainersFoundException {
+        if(this.containers.isEmpty())
+            throw new NoCellContainersFoundException(this.getClass());
         return this.containers.stream()
                 .flatMap(container -> AbstractDetections.getChildrenDetections(container)
                         .filter(object -> this.isChannelDetection(object, all)))
@@ -228,24 +222,32 @@ public abstract class AbstractDetections {
 
     /**
      * applies a list of classifiers in sequence ot the detections of the instance kind.
-     * The order of the classifiers is important. If they work on overlapping annotations, the intersection is classified using the latter classifier
+     * The order of the classifiers is important. If they work on overlapping annotations, the intersection is classified using the latter classifier.
+     * <br>
+     * If a classifier's output is not compatible with the instance, the corresponding {@link PartialClassifier} will be skipped.
      * @param classifiers the sequence of partial classifiers to apply
      * @param imageData the imageData used by the classifiers
+     * @see AbstractDetections#getDetectionsPathClasses()
+     * @see AbstractDetections#getDiscardedDetectionsPathClass()
      */
     public void applyClassifiers(List<PartialClassifier> classifiers, ImageData<?> imageData) {
         classifiers = removeUselessClassifiers(classifiers);
         List<PathDetectionObject> cells = new ArrayList<>();
-        for (PartialClassifier partialClassifier: classifiers) {
-            ObjectClassifier classifier = partialClassifier.classifier();
-            Collection<PathAnnotationObject> toClassify = partialClassifier.annotations();
-            try {
-                cells.addAll(this.classifyInside(classifier, toClassify, imageData));
-            } catch (IncompatibleClassifier e) {
-                BraiAnExtension.logger.warn("Skipping {}...\n\t{}", classifier, e.getMessage().replace("\n", "\n\t"));
-                return;
+        try {
+            for (PartialClassifier partialClassifier : classifiers) {
+                ObjectClassifier classifier = partialClassifier.classifier();
+                Collection<PathAnnotationObject> toClassify = partialClassifier.annotations();
+                try {
+                    cells.addAll(this.classifyInside(classifier, toClassify, imageData));
+                } catch (IncompatibleClassifier e) {
+                    BraiAnExtension.logger.warn("Skipping {}...\n\t{}", classifier, e.getMessage().replace("\n", "\n\t"));
+                    return;
+                }
             }
+            this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
+        } catch (NoCellContainersFoundException e) {
+            BraiAnExtension.getLogger().warn("No containers of '{}' detections found. No classification made", getContainersName());
         }
-        this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
     }
 
     private static List<PartialClassifier> removeUselessClassifiers(List<PartialClassifier> partialClassifiers) {
@@ -261,12 +263,15 @@ public abstract class AbstractDetections {
         return partialClassifiers;
     }
 
-    private <T> List<PathDetectionObject> classifyInside(ObjectClassifier<T> classifier, Collection<PathAnnotationObject> annotations, ImageData<T> imageData) throws IncompatibleClassifier {
+    private <T> List<PathDetectionObject> classifyInside(ObjectClassifier<T> classifier,
+                                                         Collection<PathAnnotationObject> annotations,
+                                                         ImageData<T> imageData) throws IncompatibleClassifier, NoCellContainersFoundException {
         if(!this.isCompatibleClassifier(classifier))
             throw new IncompatibleClassifier(classifier.getPathClasses(), this.getDetectionsPathClasses(), this.getDiscardedDetectionsPathClass());
         List<PathDetectionObject> cells;
         if(annotations == null)
-            cells = this.getContainersDetections(true); // get ALL detections. Even those there were discarded
+            // get ALL detections. Even those there were discarded. Can't use this.toStream()
+            cells = this.getContainersDetections(true); // throws NoCellContainersFoundException
         else
             cells = annotations.stream()
                     .flatMap(a -> AbstractDetections.getDetectionsInside(a, this.hierarchy))
@@ -285,5 +290,13 @@ public abstract class AbstractDetections {
             return false;
         return outputClasses.containsAll(this.getDetectionsPathClasses()) &&
                 outputClasses.contains(this.getDiscardedDetectionsPathClass());
+    }
+}
+
+class IncompatibleClassifier extends Exception {
+    public IncompatibleClassifier(Collection<PathClass> classifierOutputs, List<PathClass> detectionClasses, PathClass discardedChannelClass) {
+        super("The provided classifier is incompatibile.\n" +
+                "Expected: ["+ BraiAn.join(detectionClasses, ", ")+", "+discardedChannelClass+"]\n" +
+                "Got: "+classifierOutputs.toString());
     }
 }
