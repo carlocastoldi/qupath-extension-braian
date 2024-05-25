@@ -21,19 +21,33 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import static qupath.ext.braian.BraiAnExtension.getLogger;
+
+/**
+ * This class reads a YAML file and can be used to apply the given parameters to the computation offered by BraiAn extension
+ * For more information, read <a href="https://github.com/carlocastoldi/qupath-extension-braian/blob/master/BraiAn.yml">this config file example</a>.
+ */
 public class ProjectsConfig {
-    public static ProjectsConfig read(String yamlFileName) throws IOException {
+    /**
+     * Reads a BraiAn configuration file
+     * @param yamlFileName the name of the file, not the path.
+     *                     It will then search it first into the project's directory and, if it wasn't there, in its parent directory.
+     *                     If it cannot still find it, it throws {@link java.io.FileNotFoundException}
+     * @return an instance of <code>ProjectsConfig</code>
+     * @throws IOException if it found the config file, but it had problems while reading it.
+     * @throws YAMLException if it found and read the config file, but it was badly formatted.
+     */
+    public static ProjectsConfig read(String yamlFileName) throws IOException, YAMLException {
         Path filePath = BraiAn.resolvePath(yamlFileName);
-        BraiAnExtension.getLogger().info("using '{}' configuration file.", filePath);
+        getLogger().info("using '{}' configuration file.", filePath);
         String configStream = Files.readString(filePath, StandardCharsets.UTF_8);
 
         try {
             Constructor c = new Constructor(ProjectsConfig.class, new LoaderOptions());
             return new Yaml(c).load(configStream);
         } catch (YAMLException e) {
-            throw new RuntimeException("Could not parse the file '"+filePath+"'.\n" +
-                    "Please check that it is correctly formatted!\n\n" +
-                    e.getMessage());
+            getLogger().error("Could not interpret the file '{}'. Please check that it is correctly formatted!", filePath);
+            throw e;
         }
     }
 
@@ -45,6 +59,13 @@ public class ProjectsConfig {
         return classForDetections;
     }
 
+    /**
+     * Finds (or creates) the annotations chosen for computing the detections, accordingly to the configuration file.
+     * It reads the value of 'classForDetections' in the YAML and searches all annotations having the appointed classification
+     * @param hierarchy where to search the annotations in
+     * @return the annotations to be used for computing the detections
+     * @see qupath.ext.braian.ChannelDetections
+     */
     public Collection<PathAnnotationObject> getAnnotationsForDetections(PathObjectHierarchy hierarchy) {
         String classForDetections = this.getClassForDetections();
         if(classForDetections == null)
@@ -69,6 +90,11 @@ public class ProjectsConfig {
         this.detectionsCheck = detectionsCheck;
     }
 
+    /**
+     * Retrieves the name of the channel to be used as control in the overlapping
+     * @return an empty optional if no overlapping is desired or if there there is only one image channel to compute the detections for
+     * @see qupath.ext.braian.OverlappingDetections
+     */
     public Optional<String> getControlChannel() {
         if (!this.detectionsCheck.getApply() || this.channelDetections.size() < 2) // if there is only one channel with detections, it is useless to have a controlChannel
             return Optional.empty();

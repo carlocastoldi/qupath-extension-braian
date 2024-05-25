@@ -8,7 +8,7 @@
  * You need to:
  *  - have a BraiAn.yml file in the project folder (or its parent directory)
  *  - have an opened image which has been registered and imported with ABBA (https://github.com/BIOP/qupath-extension-abba/)
- *  - have excluded the brain regions that are missing badly aligned to the image
+ *  - have excluded the brain regions that are missing or badly aligned to the image
  *    This can be done by:
  *      + either drawing a larger annotation, classified as "Exclude", that contains the above mentioned regions
  *      + or DUPLICATING (SHIFT+D) a brain region annotation and then classifying it as "Exclude"

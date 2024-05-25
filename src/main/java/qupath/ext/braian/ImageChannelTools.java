@@ -94,10 +94,19 @@ public class ImageChannelTools {
         return stats;
     }
 
+    /**
+     * @return the name of the associated image channel
+     */
     public String getName() {
         return this.name;
     }
 
+    /**
+     * returns an instance of {@link ChannelDetections}, if existing in the current hierarchy
+     * @param hierarchy where to find the detections
+     * @throws NoCellContainersFoundException if no pre-computed detection was found in the given hierarchy
+     * @see ChannelDetections
+     */
     public ChannelDetections getDetections(PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
         return new ChannelDetections(this, hierarchy);
     }

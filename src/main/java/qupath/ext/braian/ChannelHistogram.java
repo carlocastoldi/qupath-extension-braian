@@ -29,6 +29,9 @@ public class ChannelHistogram {
             this.values = stats.getHistogram();
     }
 
+    /**
+     * @return the name of the channel from which this histogram was built
+     */
     public String getChannelName() {
         return this.channelName;
     }
@@ -56,12 +59,12 @@ public class ChannelHistogram {
     /**
      * Smooths the ChannelHistogram and find the color values that appear the most.
      * <p>
-     * It applies {@link #findHistogramPeaks(int, double)} with <code>windowSize=14</code>
-     * and <code>prominence=0.01</code>
+     * It applies {@link #findHistogramPeaks(int, double)} with <code>windowSize=15</code>
+     * and <code>prominence=100</code>
      * @return an array of the color values
      */
     public int[] findHistogramPeaks() {
-        return findHistogramPeaks(15, 0); // 0.01
+        return findHistogramPeaks(15, 100);
     }
 
     /**

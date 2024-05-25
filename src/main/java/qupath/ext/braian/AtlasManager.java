@@ -31,10 +31,18 @@ class ImportedAtlasNotFound extends RuntimeException {
     }
 }
 
+/**
+ * This class helps managing and exporting results for each brain region. It works closely with ABBA's QuPath extension.
+ */
 public class AtlasManager {
     public final static String um = GeneralTools.micrometerSymbol();
     public final static PathClass EXCLUDE_CLASSIFICATION = PathClass.fromString("Exclude");
 
+    /**
+     * Checks whether an ABBA atlas was previously imported.
+     * @param hierarchy where to search for the atlas
+     * @return true if an ABBA atlas was previously imported
+     */
     public static boolean isImported(PathObjectHierarchy hierarchy) {
         return !AtlasManager.search(hierarchy).isEmpty();
     }
@@ -77,6 +85,9 @@ public class AtlasManager {
     private final PathObject atlasObject;
     private final PathObjectHierarchy hierarchy;
 
+    /**
+     * @param hierarchy where to search for the atlas
+     */
     public AtlasManager(PathObjectHierarchy hierarchy) {
         this.hierarchy = hierarchy;
         List<PathObject> atlases = AtlasManager.search(hierarchy);
@@ -87,19 +98,21 @@ public class AtlasManager {
             getLogger().warn("Several imported atlases have been found. Selecting: {}", this.atlasObject);
     }
 
+    /**
+     * Flattens the atlas's ontology into a list of annotations
+     * @return the list of all brain regions in the atlas
+     */
     public List<PathObject> flatten() {
         return AtlasManager.flattenObject(this.atlasObject);
     }
 
-    // Olivier Burri <https://github.com/lacan> wrote mostly of this function and published under Apache-2.0 license for qupath-extension-biop
     /**
-     * By making use of ObservableMeasurementTableData, we can query each result and get a string back Works, for area,
-     * PathClasses, parents, and of course any other measurement in the final table
-     *
-     * @param file   the file where this tool should write to. Note that if the file exists, it will be appended
-     * @see ObservableMeasurementTableData
-     * @author Oliver Burri
+     * Saves a TSV file containing data for each bran region of the atlas.
+     * Namely, Image name, brain region name, hemisphere, area in µm², number of detection for each of the given types
+     * @param detections the list of detection of which to gather the data for each region
+     * @param file the file where it should write to. Note that if the file exists, it will be overwritten
      */
+    // Olivier Burri <https://github.com/lacan> wrote mostly of this function and published under Apache-2.0 license for qupath-extension-biop
     public boolean saveResults(List<AbstractDetections> detections, File file) {
         if (file.exists())
             if(!file.delete()) {
@@ -147,6 +160,15 @@ public class AtlasManager {
         return isSaved;
     }
 
+    /**
+     * Gets all the brain regions that should be excluded from further analysis due to being missing or badly aligned to the image.
+     * A brain region, in order to be excluded, must:
+     * <ul>
+     *   <li>either be contained into a larger annotation, classified as "Exclude"
+     * 	 <li>or be <b>duplicated</b> (SHIFT+D) outside the Atlas's hierarchy, and then classified as "Exclude"
+     * </ul>
+     * @return a set of brain regions' annotations that should be excluded
+     */
     public Set<PathObject> getExcludedBrainRegions() {
         List<PathObject> excludeAnnotations = AtlasManager.getExclusionAnnotations(this.hierarchy);
         getLogger().info("Exclusion annotations: [{}]", BraiAn.join(excludeAnnotations, ", "));
@@ -171,6 +193,12 @@ public class AtlasManager {
         return regionsToExclude;
     }
 
+    /**
+     * Saves a file containing, on each line, the name and hemisphere of the regions to be excluded.
+     * @param file the file where it should write to. Note that if the file exists, it will be overwritten
+     * @see #getExcludedBrainRegions()
+     * @see #saveResults(List, File)
+     */
     public boolean saveExcludedRegions(File file) {
         if (file.exists())
             if(!file.delete()) {
