@@ -29,15 +29,25 @@ public class BraiAnExtension implements QuPathExtension, GitHubProject {
 
     static final Logger logger = LoggerFactory.getLogger(BraiAnExtension.class);
 
+    /**
+     * @return the logger used by the extension to print messages
+     */
     public static Logger getLogger() {
         return logger;
     }
 
+    /**
+     * @return the repository where the extension is hosted
+     */
     @Override
     public GitHubRepo getRepository() {
         return GitHubRepo.create("BraiAn extension", "carlocastoldi", "qupath-extension-braian");
     }
 
+    /**
+     * integrate the extension in QuPath GUI
+     * @param qupath the istance of QuPath to modify
+     */
     @Override
     public void installExtension(QuPathGUI qupath) {
         this.addCommands(qupath);
@@ -121,11 +131,17 @@ public class BraiAnExtension implements QuPathExtension, GitHubProject {
         qupath.getScriptEditor().showScript(scriptName, scriptCode);
     }
 
+    /**
+     * @return the name of the extension
+     */
     @Override
     public String getName() {
         return "BraiAn extension";
     }
 
+    /**
+     * @return the description of the extension
+     */
     @Override
     public String getDescription() {
         return "A collection of tools for whole-brain data extraction";

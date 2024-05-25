@@ -69,7 +69,7 @@ channelDetections:                        # DEFAULT: empty (i.e. BraiAn does not
                                           #               Add default shape & intensity measurements during detection
     classifiers:                          # DEFAULT empty (i.e. no classifier is applied)
                                           #               A list of classifiers to apply in sequence to the channel's detections
-                                          #               The order of the classifier is important. If they work on overlapping annotations, the intersection is classified using the latter classifier
+                                          #               The order of the classifiers is important. If they work on overlapping annotations, the intersection is classified using the latter classifier
       - name: "AF568_cFos_classifier"     # DEFAULT: null
                                           #               name of the classifier's json file to use on this channel detections
                                           #               Contrary to what QuPath does by default, BraiAn searches it in the project's directory or in its parent directory
