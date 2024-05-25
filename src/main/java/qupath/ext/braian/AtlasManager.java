@@ -58,6 +58,7 @@ public class AtlasManager {
     }
 
     private static List<String> getDetectionsMeasurements(List<AbstractDetections> detections) {
+        // TODO: should avoid resorting to QP to get the server metadata
         var cal = QP.getCurrentServer().getMetadata().getPixelCalibration();
         if (!um.equals(cal.getPixelWidthUnit()) || !um.equals(cal.getPixelHeightUnit()))
             throw new RuntimeException("FAILED to export results. Expected image pixel units to be in 'µm', instead got them in '"+
