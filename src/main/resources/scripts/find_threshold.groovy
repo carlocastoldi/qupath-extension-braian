@@ -13,7 +13,7 @@
  */
 import qupath.ext.braian.ImageChannelTools
 import qupath.ext.braian.config.AutoThresholdParmameters
-import qupath.ext.braian.config.ProjectsConfigFile
+import qupath.ext.braian.config.ProjectsConfig
 import qupath.ext.braian.config.WatershedCellDetectionConfig
 
 import static qupath.lib.scripting.QP.*
@@ -34,6 +34,6 @@ thresholder.nPeak = 2            // take the second peak as threshold
 WatershedCellDetectionConfig.findThreshold(channel, thresholder)
 
 // you can also check it using BraiAn.yml's settings
-ProjectsConfigFile.read("BraiAn.yml").channelDetections
+ProjectsConfig.read("BraiAn.yml").channelDetections
         .find { detectionsConf -> detectionsConf.name == channel.name }
         .parameters.build(channel)

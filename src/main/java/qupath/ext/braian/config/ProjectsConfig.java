@@ -21,14 +21,14 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public class ProjectsConfigFile {
-    public static ProjectsConfigFile read(String yamlFileName) throws IOException {
+public class ProjectsConfig {
+    public static ProjectsConfig read(String yamlFileName) throws IOException {
         Path filePath = BraiAn.resolvePath(yamlFileName);
         BraiAnExtension.getLogger().info("using '{}' configuration file.", filePath);
         String configStream = Files.readString(filePath, StandardCharsets.UTF_8);
 
         try {
-            Constructor c = new Constructor(ProjectsConfigFile.class, new LoaderOptions());
+            Constructor c = new Constructor(ProjectsConfig.class, new LoaderOptions());
             return new Yaml(c).load(configStream);
         } catch (YAMLException e) {
             throw new RuntimeException("Could not parse the file '"+filePath+"'.\n" +

@@ -24,14 +24,14 @@ import qupath.ext.braian.AtlasManager
 import qupath.ext.braian.OverlappingDetections
 import qupath.ext.braian.ImageChannelTools
 import qupath.ext.braian.ChannelDetections
-import qupath.ext.braian.config.ProjectsConfigFile
+import qupath.ext.braian.config.ProjectsConfig
 
 import static qupath.lib.scripting.QP.*
 
 var imageData = getCurrentImageData()
 var server = imageData.getServer()
 var hierarchy = imageData.getHierarchy()
-var config = ProjectsConfigFile.read("BraiAn.yml")
+var config = ProjectsConfig.read("BraiAn.yml")
 var annotations = config.getAnnotationsForDetections(hierarchy)
 
 // COMPUTE CHANNEL DETECTIONS
