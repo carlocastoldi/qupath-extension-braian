@@ -25,10 +25,10 @@ Its core idea is to move _outside_ of scripts' code the input parameters used to
 This allows to have a reproducible configuration that can be shared, backed up and ran after long.
 
 Apart from that, the extensions is a proper [library](https://carlocastoldi.github.io/qupath-extension-braian/docs/), and among all allows to:
-- work with image channel histograms
+- work with image channel histograms, thanks to `ChannelHistogram.class`
 - compute and manage detections separately for each image channel
-- apply different classifiers on different subsets of detections
-- find _quickly_ all detections that are double (or triple/multiple) positive
+- apply different classifiers on different subsets of detections, thanks to `PartialClassifier.class`
+- find _quickly_ all detections that are double (or triple/multiple) positive, thanks to `BoundingBoxHierarchy.class`
 - exports to file the number of detections/double+ found in each brain region
 - exports to file a list of regions that have to be excluded from further analysis
 
