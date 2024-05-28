@@ -9,7 +9,7 @@ SPDX-License-Identifier: CC0-1.0
 [![branches coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carlocastoldi/qupath-extension-braian/badges/.github/badges/branches.json)](https://carlocastoldi.github.io/qupath-extension-braian/coverage/)
 
 Extends QuPath's functionalities for whole-brain data extraction. It works best if coupled with:
-* [`qupath-extension-abba`](https://github.com/biop/qupath-extension-abba): for importing importing brain atlas annotations from [ABBA](https://abba-documentation.readthedocs.io/en/latest/)
+* [`qupath-extension-abba`](https://github.com/biop/qupath-extension-abba): for importing importing brain atlas annotations from [ABBA](https://go.epfl.ch/abba)
 * [`braian`](https://codeberg.org/SilvaLab/BraiAn): the associated python library for whole-brain analysis and visualization
 
 YSK: BraiAn's names stands for _**Brai**n **An**alysis_.
@@ -20,7 +20,7 @@ I suggest you to listen to "[Brianstorm](https://en.wikipedia.org/wiki/Brianstor
 ## Features
 
 This extension helps you managing multiple QuPath projects with the same parameters.
-It was first developed to work with [ABBA](https://abba-documentation.readthedocs.io/en/latest/), but can be used for other purposes as well.
+It was first developed to work with [ABBA](https://go.epfl.ch/abba), but can be used for other purposes as well.
 Its core idea is to move _outside_ of scripts' code the input parameters used to analyse multiple QP projects of the same cohort/experiment.
 This allows to have a reproducible configuration that can be shared, backed up and ran after long periods of time.
 
