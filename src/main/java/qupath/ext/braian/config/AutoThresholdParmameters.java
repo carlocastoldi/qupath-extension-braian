@@ -8,7 +8,7 @@ public class AutoThresholdParmameters {
     private int resolutionLevel = 4;
     private int smoothWindowSize = 15;
     private double peakProminence = 100;
-    private int nPeak = 1;
+    private int nPeak = 0;
 
     public int getResolutionLevel() {
         return resolutionLevel;
