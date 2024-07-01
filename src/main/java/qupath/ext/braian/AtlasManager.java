@@ -132,6 +132,7 @@ public class AtlasManager {
         ProjectImageEntry<BufferedImage> entry = QP.getProjectEntry();
 
         String rawImageName = entry.getImageName();
+        double numericValue;
 
         // Add value for each selected object
         for (PathObject brainRegion : brainRegions) {
@@ -149,8 +150,12 @@ public class AtlasManager {
             // Then we can add the results the user requested
             // Because the Mu is sometimes poorly formatted, we remove them in favor of a 'u'
             for (String col : AtlasManager.getDetectionsMeasurements(detections)) {
-                if (ob.isNumericMeasurement(col))
-                    results.addValue(col.replace(um, "um"), ob.getNumericValue(brainRegion, col));
+                if (ob.isNumericMeasurement(col)) {
+                    numericValue = ob.getNumericValue(brainRegion, col);
+                    if (col.startsWith("Num ") && Double.isNaN(numericValue))
+                        numericValue = 0.;
+                    results.addValue(col.replace(um, "um"), numericValue);
+                }
                 if (ob.isStringMeasurement(col))
                     results.addValue(col.replace(um, "um"), ob.getStringValue(brainRegion, col));
             }
