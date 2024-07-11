@@ -72,7 +72,7 @@ public class ProjectsConfig {
             return null;
         return hierarchy.getAnnotationObjects()
                 .stream()
-                .filter(annotation -> classForDetections.equals(annotation.getPathClass().getName()))
+                .filter(annotation -> annotation.getPathClass() != null && classForDetections.equals(annotation.getPathClass().getName()))
                 //.filter(annotation -> classForDetections.equals(annotation.getName()))
                 .map(annotation -> (PathAnnotationObject) annotation)
                 .toList();

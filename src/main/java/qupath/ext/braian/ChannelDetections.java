@@ -41,7 +41,8 @@ public class ChannelDetections extends AbstractDetections {
     }
 
     /**
-     * Creates an instance based on pre-computed cell detections
+     * Creates an instance based on pre-computed cell detections.
+     * It selects all detections that are computed in a container identified by {@code channelName}.
      * @param channelName the name of the channel to which the detections are linked to
      * @param hierarchy where to find the detections
      * @throws NoCellContainersFoundException if no pre-computed detection was found in the given hierarchy
@@ -53,7 +54,8 @@ public class ChannelDetections extends AbstractDetections {
     }
 
     /**
-     * Creates an instance based on pre-computed cell detections
+     * Creates an instance based on pre-computed cell detections.
+     * It selects all detections that are computed in a container identified by {@code channel}.
      * @param channel the channel to which the detections are linked to
      * @param hierarchy where to find the detections
      * @throws NoCellContainersFoundException if no pre-computed detection was found in the given hierarchy
@@ -79,10 +81,11 @@ public class ChannelDetections extends AbstractDetections {
                              PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
         this(channel, hierarchy);
 
-        if(annotations == null || annotations.isEmpty()) {
-            // throw new IllegalArgumentException("You must give at least one annotation on which to compute the detections");
+        if(annotations == null) {
             PathAnnotationObject fullImage = ChannelDetections.getFullImageDetectionAnnotation(hierarchy);
             annotations = List.of(fullImage);
+        } else if (annotations.isEmpty()) {
+            throw new IllegalArgumentException("You must give at least one annotation on which to compute the detections");
         }
         Map<String, ?> params = config.build(channel);
         // TODO: check if the given annotations overlap. If they do, throw an error as that would duplicate detections

@@ -50,6 +50,8 @@ public class OverlappingDetections extends AbstractDetections {
 
     private static Collection<PathClass> getAllPossibleOverlappingClassifications(AbstractDetections control,
                                                                                   Collection<AbstractDetections> otherDetections) {
+        if (otherDetections.isEmpty())
+            throw new IllegalArgumentException("You have to overlap at least two detections; 'others' cannot be empty");
         return OverlappingDetections.createAllOverlappingClassNames(
                         otherDetections.stream().map(AbstractDetections::getId).toList())
                 .stream()

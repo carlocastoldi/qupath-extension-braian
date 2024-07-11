@@ -37,7 +37,16 @@ var annotations = config.getAnnotationsForDetections(hierarchy)
 // COMPUTE CHANNEL DETECTIONS
 var allDetections = config.channelDetections.collect { detectionsConf ->
     var channel = new ImageChannelTools(detectionsConf.name, server)
-    new ChannelDetections(channel, annotations, detectionsConf.parameters, hierarchy)
+    try {
+        new ChannelDetections(channel, annotations, detectionsConf.parameters, hierarchy)
+    } catch (IllegalArgumentException ignored) {
+        null
+    }
+}.findAll { it != null }
+
+if (allDetections.isEmpty()) {
+    println getCurrentImageName()+" : DONE! No annotations found to compute on"
+    return
 }
 
 // RETRIEVE PRE-COMPUTED CHANNEL DETECTIONS
@@ -76,4 +85,4 @@ if (AtlasManager.isImported(hierarchy)) {
     atlas.saveExcludedRegions(exclusionsFile)
 }
 
-println getProjectEntry().getImageName()+" : DONE!"
+println getCurrentImageName()+" : DONE!"
