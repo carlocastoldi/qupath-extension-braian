@@ -12,24 +12,26 @@ import qupath.lib.projects.Projects;
 import java.io.FileNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 
 import static qupath.lib.scripting.QP.getProject;
 
 public class BraiAn {
-    public static Path resolvePath(String fileName) throws FileNotFoundException {
+    public static Optional<Path> resolvePathIfPresent(String fileName) {
         Path projectPath = Projects.getBaseDirectory(getProject()).toPath();
         Path projectParentDirectoryPath = projectPath.getParent();
         Path[] resolutionOrder = {projectPath, projectParentDirectoryPath};
         for (Path path: resolutionOrder) {
             Path filePath = path.resolve(fileName);
             if (Files.exists(filePath))
-                return filePath;
+                return Optional.of(filePath);
         }
-        throw new FileNotFoundException("Can't find the specified file: '"+fileName+"'");
+        return Optional.empty();
+    }
+
+    public static Path resolvePath(String fileName) throws FileNotFoundException {
+        return resolvePathIfPresent(fileName)
+                .orElseThrow(() -> new FileNotFoundException("Can't find the specified file: '"+fileName+"'"));
     }
 
     public static void populatePathClassGUI(PathClass... toAdd) {

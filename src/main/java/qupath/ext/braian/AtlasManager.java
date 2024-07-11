@@ -7,6 +7,7 @@ package qupath.ext.braian;
 import qupath.ext.braian.utils.BraiAn;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
+import qupath.lib.objects.PathAnnotationObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static qupath.ext.braian.BraiAnExtension.getLogger;
+import static qupath.ext.braian.BraiAnExtension.logger;
 
 class ImportedAtlasNotFound extends RuntimeException {
     public ImportedAtlasNotFound() {
@@ -57,7 +59,9 @@ public class AtlasManager {
     private static Stream<PathObject> flattenObjectStream(PathObject parent) {
         return Stream.concat(
                 Stream.of(parent),
-                parent.getChildObjects().stream().flatMap(AtlasManager::flattenObjectStream)
+                parent.getChildObjects().stream()
+                        .filter(o -> o instanceof PathAnnotationObject)
+                        .flatMap(AtlasManager::flattenObjectStream)
         );
     }
 
@@ -99,11 +103,30 @@ public class AtlasManager {
     }
 
     /**
-     * Flattens the atlas's ontology into a list of annotations
+     * Flattens the atlas's ontology into a list of annotations.
+     * It may return some non-region annotations too, if the atlas hierarchy was modified with added/removed elements.
      * @return the list of all brain regions in the atlas
+     * @see #flatten(List)
      */
     public List<PathObject> flatten() {
         return AtlasManager.flattenObject(this.atlasObject);
+    }
+
+    /**
+     * Flattens the atlas's ontology into a list of annotations.
+     * If the atlas hierarchy was modified by adding {@link AbstractDetections}'s containers,
+     * it filters them from the current brain hierarchy.
+     * <br>
+     * It may still return some non-region annotations, if the atlas hierarchy was further modified with added/removed elements.
+     * @return the list of all brain regions in the atlas
+     * @see #flatten()
+     */
+    public List<PathObject> flatten(List<AbstractDetections> detections) {
+        List<PathAnnotationObject> containers = detections.stream().flatMap(d -> d.getContainers().stream()).toList();
+        List<PathObject> brainRegions = AtlasManager.flattenObjectStream(this.atlasObject)
+                .filter(ann -> !containers.contains(ann))
+                .toList();
+        return brainRegions;
     }
 
     /**
@@ -125,7 +148,7 @@ public class AtlasManager {
         ResultsTable results = new ResultsTable();
 
         ObservableMeasurementTableData ob = new ObservableMeasurementTableData();
-            List<PathObject> brainRegions = this.flatten();
+        List<PathObject> brainRegions = this.flatten(detections);
         // This line creates all the measurements
         ob.setImageData(QP.getCurrentImageData(), brainRegions);
 

@@ -33,6 +33,9 @@ public class ChannelDetectionsConfig {
     }
 
     public void setClassifiers(List<ChannelClassifierConfig> classifiers) {
+        for (ChannelClassifierConfig classifier: classifiers) {
+            classifier.setChannel(this.name);
+        }
         this.classifiers = classifiers;
     }
 }

@@ -40,6 +40,10 @@ public class ChannelDetections extends AbstractDetections {
         }
     }
 
+    public static PathClass createClassification(String channelName) {
+        return PathClass.fromString(channelName);
+    }
+
     /**
      * Creates an instance based on pre-computed cell detections.
      * It selects all detections that are computed in a container identified by {@code channelName}.
@@ -50,7 +54,7 @@ public class ChannelDetections extends AbstractDetections {
      * @see AbstractDetections
      */
     public ChannelDetections(String channelName, PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
-        super(channelName, List.of(PathClass.fromString(channelName)), hierarchy);
+        super(channelName, List.of(createClassification(channelName)), hierarchy);
     }
 
     /**

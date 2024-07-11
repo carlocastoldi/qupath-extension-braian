@@ -4,7 +4,9 @@
 
 package qupath.ext.braian.config;
 
+import qupath.ext.braian.ChannelDetections;
 import qupath.ext.braian.PartialClassifier;
+import qupath.ext.braian.SingleClassifier;
 import qupath.ext.braian.utils.BraiAn;
 import qupath.lib.classifiers.object.ObjectClassifier;
 import qupath.lib.classifiers.object.ObjectClassifiers;
@@ -21,8 +23,19 @@ import java.util.List;
 import static qupath.lib.scripting.QP.getProject;
 
 public class ChannelClassifierConfig {
+    private String channel;
     private String name;
     private List<String> annotationsToClassify; // names of the annotations to classify
+
+    public String getChannel() {
+        return this.channel;
+    }
+
+    public void setChannel(String channel) {
+        if (channel == null)
+            throw new IllegalArgumentException("'channel' must be non-null value.");
+        this.channel = channel;
+    }
 
     public String getName() {
         return name;
@@ -70,6 +83,12 @@ public class ChannelClassifierConfig {
     }
 
     public PartialClassifier toPartialClassifier(PathObjectHierarchy hierarchy) throws IOException {
-        return new PartialClassifier(this.loadClassifier(), this.getAnnotationsToClassify(hierarchy));
+        ObjectClassifier classifier;
+        if (this.getName().toLowerCase().equals("all"))
+            classifier = new SingleClassifier(ChannelDetections.createClassification(this.channel));
+        else {
+            classifier = this.loadClassifier();
+        }
+        return new PartialClassifier(classifier, this.getAnnotationsToClassify(hierarchy));
     }
 }

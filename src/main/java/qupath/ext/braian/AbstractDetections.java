@@ -266,7 +266,9 @@ public abstract class AbstractDetections {
     private <T> List<PathDetectionObject> classifyInside(ObjectClassifier<T> classifier,
                                                          Collection<PathAnnotationObject> annotations,
                                                          ImageData<T> imageData) throws IncompatibleClassifier, NoCellContainersFoundException {
-        if(!this.isCompatibleClassifier(classifier))
+        if(!this.isCompatibleClassifier(classifier) &&
+                !(classifier instanceof SingleClassifier &&
+                        this.getDetectionsPathClasses().contains(classifier.getPathClasses().toArray()[0])))
             throw new IncompatibleClassifier(classifier.getPathClasses(), this.getDetectionsPathClasses(), this.getDiscardedDetectionsPathClass());
         List<PathDetectionObject> cells;
         if(annotations == null)
