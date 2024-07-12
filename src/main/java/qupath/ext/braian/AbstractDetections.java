@@ -14,10 +14,7 @@ import qupath.lib.objects.PathObjectTools;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -293,6 +290,83 @@ public abstract class AbstractDetections {
         return outputClasses.containsAll(this.getDetectionsPathClasses()) &&
                 outputClasses.contains(this.getDiscardedDetectionsPathClass());
     }
+
+    /**
+     * Check whether two {@code AbstractDetections} are compatible.
+     * They are compatible if they work on the same hierarchy, they have the same {@link #getId()},
+     * they work on the same type of containers and on the same {@link #getDetectionsPathClasses()}
+     * @param other an instance of the detections to check against the current one
+     * @return true, if compatible. False otherwise.
+     * @see #getId()
+     * @see #getContainersName()
+     * @see #getDetectionsPathClasses()
+     */
+    public boolean isCompatibleWith(AbstractDetections other) {
+        return other != null
+                && this.id.equals(other.id)
+                && this.getContainersName().equals(other.getContainersName())
+                && this.hierarchy.equals(other.hierarchy)
+                && new HashSet<>(this.detectionClasses).equals(new HashSet<>(other.detectionClasses));
+    }
+
+    /**
+     * Adds the detections from another {@link AbstractDetections} into the current instance's containers.
+     * It is relevant only when {@code other} is constructed after the current instance, and the current instance is not
+     * yet synchronized with {@link #fireUpdate()}.<br>
+     * All current containers that overlap with {@code other}'s containers, get updated with the newest provided detections.
+     * In the end, the two  {@link AbstractDetections} will be functionally the same.
+     * @param other the detections to add to the current instance
+     * @throws IncompatibleDetections when {@code other}'s detection cannot be added to the current instance
+     * @throws NoCellContainersFoundException when no container is found in both instances
+     * @see #isCompatibleWith(AbstractDetections)
+     * @see #fireUpdate()
+     */
+    public void addAll(AbstractDetections other) throws IncompatibleDetections, NoCellContainersFoundException {
+        if (this == other || this.equals(other))
+            return;
+        if (!this.isCompatibleWith(other))
+            throw new IncompatibleDetections(this, other);
+
+        // REMOVE ALL OLD DETECTIONS COVERED BY `other`, IF ANY
+        other.containers.stream()
+                .filter(c -> !this.containers.contains(c))                                                          // get new containers only
+                .forEach(c -> {
+                    List<PathDetectionObject> oldDetections = AbstractDetections.getDetectionsInside(c, hierarchy)  // it's a detection inside a new container
+                            .filter(detection -> this.isChannelDetection(detection, true)                           // it's a compatible detection
+                                    && other.getOverlappingObjectIfPresent(detection).orElse(null) != detection)    // but it not part of `other`'s internal representation (i.e. it's not a new detection)
+                            .toList();
+                    hierarchy.removeObjects(oldDetections, false);
+                });
+        // ADD ALL NEW DETECTIONS
+        for (PathAnnotationObject outerContainer: this.containers) {
+            other.toStream()
+                    .filter( detection -> outerContainer.getROI().contains(detection.getROI().getCentroidX(), detection.getROI().getCentroidY()))
+                    .forEach( detection -> this.hierarchy.addObjectBelowParent(outerContainer, detection, false) );
+        }
+        // REMOVE EMPTY CONTAINERS, IF ANY
+        other.hierarchy.removeObjects(
+                other.containers.stream().filter(c -> c.getChildObjects().isEmpty()).toList(),
+                false
+        );
+        this.hierarchy.fireHierarchyChangedEvent(this);
+        // ADD ALL DETECTION IN NEW CONTAINERS
+        this.fireUpdate();
+        other.fireUpdate();
+    }
+
+    /**
+     * Two detection objects are the functionally same if they are compatible with each other and they have the same containers
+     * @param obj
+     * @return True, if they are functionally the same. False otherwise
+     * @see #isCompatibleWith(AbstractDetections)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null || !this.getClass().equals(obj.getClass()))
+            return false;
+        AbstractDetections other = (AbstractDetections) obj;
+        return this.isCompatibleWith(other) && new HashSet<>(this.containers).equals(new HashSet<>(other.containers));
+    }
 }
 
 class IncompatibleClassifier extends Exception {
@@ -300,5 +374,11 @@ class IncompatibleClassifier extends Exception {
         super("The provided classifier is incompatibile.\n" +
                 "Expected: ["+ BraiAn.join(detectionClasses, ", ")+", "+discardedChannelClass+"]\n" +
                 "Got: "+classifierOutputs.toString());
+    }
+}
+
+class IncompatibleDetections extends Exception {
+    public IncompatibleDetections(AbstractDetections d1, AbstractDetections d2) {
+        super("The provided detections are incompatibile: " + d1 + " and " + d2);
     }
 }
