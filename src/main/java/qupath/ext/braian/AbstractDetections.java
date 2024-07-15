@@ -73,8 +73,27 @@ public abstract class AbstractDetections {
      */
     public void fireUpdate() throws NoCellContainersFoundException {
         this.containers = this.searchContainers();
+        if (this.containers.isEmpty()) {
+            this.bbh = new BoundingBoxHierarchy(new ArrayList<>(), BBH_MAX_DEPTH);
+            return;
+        }
         List<PathDetectionObject> cells = this.getContainersDetections(false); // throw NoCellContainersFoundException
         this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
+    }
+
+    /**
+     * If there is no detection within the current instance.
+     * <br>
+     * If the state was changed outside of this extension, you might need to call {@link #fireUpdate()} first.
+     * @return True, if no detection is found within the current state. False otherwise.
+     * @see #fireUpdate()
+     */
+    public boolean isEmpty() {
+        try {
+            return this.containers.isEmpty() || this.getContainersDetections(false).isEmpty();
+        } catch (NoCellContainersFoundException e) {
+            return true;
+        }
     }
 
     // TODO: allow to search for containers WITHIN a list of given annotations (useful with 'classForDetections' from ProjectsConfig)
