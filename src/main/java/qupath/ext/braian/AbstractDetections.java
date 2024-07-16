@@ -98,42 +98,55 @@ public abstract class AbstractDetections {
                 .filter(c -> this.containers.contains(c)).toList();
         List<PathAnnotationObject> newContainers = allContainers.stream()
                 .filter(c -> !this.containers.contains(c)).toList();
-        for (PathAnnotationObject oldContainer: oldContainers) {
-            ROI oldROI = oldContainer.getROI();
-            Geometry oldGeom = oldROI.getGeometry();
-            ImagePlane oldPlane = oldROI.getImagePlane();
-            for (PathAnnotationObject newContainer: newContainers) {
-                ROI c2ROI = newContainer.getROI();
-                Geometry newGeom = c2ROI.getGeometry();
-                if (oldGeom.intersects(newGeom)) {
-                    ROI intersection = GeometryTools.geometryToROI(oldGeom.intersection(newGeom), oldPlane);
-                    List<PathDetectionObject> newDetections = this.getChildrenDetections(newContainer).toList(); //collect(Collectors.toSet());
-                    BoundingBoxHierarchy newDetectionsBBH = new BoundingBoxHierarchy(newDetections, BBH_MAX_DEPTH);
-                    List<PathDetectionObject> oldDetections = AbstractDetections.getDetectionsInside(intersection, hierarchy)     // it's a detection inside a new container
-                            .filter(oldDetection -> this.isChannelDetection(oldDetection, true) && !newDetectionsBBH.contains(oldDetection))
-                            .toList();
-                    hierarchy.removeObjects(oldDetections, false);
-                    newDetections.stream()
-                            .filter( newDetection -> oldROI.contains(newDetection.getROI().getCentroidX(), newDetection.getROI().getCentroidY()))
-                            .forEach( newDetection -> this.hierarchy.addObjectBelowParent(oldContainer, newDetection, false) );
-                    ROI newDiffOld = GeometryTools.geometryToROI(newGeom.difference(oldGeom), oldPlane);
-                    newContainer.setROI(newDiffOld);
-                }
+        for (PathAnnotationObject oldContainer: oldContainers)
+            updateContainer(oldContainer, newContainers); // may shrink the overlapping newContainers
+        this.removeEmptyContainers(allContainers);
+        this.containers = allContainers;
+        List<PathDetectionObject> cells = this.getContainersDetections(false); // throw NoCellContainersFoundException
+        this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
+    }
+
+    private void updateContainer(PathAnnotationObject oldContainer, List<PathAnnotationObject> newContainers) {
+        ROI oldROI = oldContainer.getROI();
+        Geometry oldGeom = oldROI.getGeometry();
+        ImagePlane oldPlane = oldROI.getImagePlane();
+        for (PathAnnotationObject newContainer: newContainers) {
+            Geometry newGeom = newContainer.getROI().getGeometry();
+            if (oldGeom.intersects(newGeom)) {
+                ROI intersection = GeometryTools.geometryToROI(oldGeom.intersection(newGeom), oldPlane);
+                List<PathDetectionObject> newDetections = this.getChildrenDetections(newContainer).toList(); //collect(Collectors.toSet());
+                this.removeOldDetections(intersection, newDetections);
+                this.addUpdatedDetections(oldContainer, newDetections);
+                ROI newDiffOld = GeometryTools.geometryToROI(newGeom.difference(oldGeom), oldPlane);
+                newContainer.setROI(newDiffOld);
             }
         }
-        ListIterator<PathAnnotationObject> iterator = allContainers.listIterator();
+    }
+
+    private void addUpdatedDetections(PathAnnotationObject container, List<PathDetectionObject> newDetections) {
+        newDetections.stream()
+                .filter( newDetection -> container.getROI().contains(newDetection.getROI().getCentroidX(), newDetection.getROI().getCentroidY()))
+                .forEach( newDetection -> this.hierarchy.addObjectBelowParent(container, newDetection, false) );
+    }
+
+    private void removeOldDetections(ROI area, List<PathDetectionObject> newDetections) {
+        BoundingBoxHierarchy newDetectionsBBH = new BoundingBoxHierarchy(newDetections, BBH_MAX_DEPTH);
+        List<PathDetectionObject> oldDetections = AbstractDetections.getDetectionsInside(area, hierarchy)   // it's a detection inside a new container
+                .filter(oldDetection -> this.isChannelDetection(oldDetection, true) && !newDetectionsBBH.contains(oldDetection))
+                .toList();
+        hierarchy.removeObjects(oldDetections, false);
+    }
+
+    private void removeEmptyContainers(List<PathAnnotationObject> containers) {
+        ListIterator<PathAnnotationObject> iterator = containers.listIterator();
         while (iterator.hasNext()) {
             PathAnnotationObject c = iterator.next();
             if (c.getROI().isEmpty()) {
-                hierarchy.removeObject(c, false);
+                this.hierarchy.removeObject(c, false);
                 iterator.remove();
             }
         }
         this.hierarchy.fireHierarchyChangedEvent(this);
-        this.containers = allContainers;
-
-        List<PathDetectionObject> cells = this.getContainersDetections(false); // throw NoCellContainersFoundException
-        this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
     }
 
     /**
