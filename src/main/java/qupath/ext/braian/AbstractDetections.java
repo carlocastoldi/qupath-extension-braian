@@ -4,17 +4,20 @@
 
 package qupath.ext.braian;
 
+import org.locationtech.jts.geom.Geometry;
 import qupath.ext.braian.utils.BraiAn;
 import qupath.lib.classifiers.object.ObjectClassifier;
 import qupath.lib.images.ImageData;
-import qupath.lib.objects.PathAnnotationObject;
-import qupath.lib.objects.PathDetectionObject;
-import qupath.lib.objects.PathObject;
-import qupath.lib.objects.PathObjectTools;
+import qupath.lib.objects.*;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+import qupath.lib.regions.ImagePlane;
+import qupath.lib.roi.GeometryROI;
+import qupath.lib.roi.GeometryTools;
+import qupath.lib.roi.interfaces.ROI;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -32,7 +35,17 @@ public abstract class AbstractDetections {
      * @return a stream of detections found inside annotations
      */
     protected static Stream<PathDetectionObject> getDetectionsInside(PathAnnotationObject annotation, PathObjectHierarchy hierarchy) {
-        return hierarchy.getObjectsForROI(PathDetectionObject.class, annotation.getROI())
+        return getDetectionsInside(annotation.getROI(), hierarchy);
+    }
+
+    /**
+     * returns the detections inside the given {@link ROI}
+     * @param roi where the to search the detection inside
+     * @param hierarchy where to find the detections
+     * @return a stream of detections found inside annotations
+     */
+    protected static Stream<PathDetectionObject> getDetectionsInside(ROI roi, PathObjectHierarchy hierarchy) {
+        return hierarchy.getObjectsForROI(PathDetectionObject.class, roi)
                 .stream()
                 .map(o -> (PathDetectionObject) o);
     }
@@ -46,7 +59,7 @@ public abstract class AbstractDetections {
     private final String id;
     private final PathObjectHierarchy hierarchy;
     private final List<PathClass> detectionClasses;
-    private List<PathAnnotationObject> containers;
+    private List<PathAnnotationObject> containers = new ArrayList<>();
     private BoundingBoxHierarchy bbh;
 
     /**
@@ -67,16 +80,58 @@ public abstract class AbstractDetections {
     }
 
     /**
-     * used to update the internal representation to the current state.
+     * Updates the internal representation to the current state.
+     * If a new container of detections is added and overlaps the old containers, it updates the old detections with the new ones.
+     * Additionally, it makes sure that the newer containers don't overlap with the old ones.
+     * <br>
      * If container annotations or detections are touched outside of BraiAn, it's better to call this method.
      * @throws NoCellContainersFoundException if there is no compatible container in the hierarchy
      */
     public void fireUpdate() throws NoCellContainersFoundException {
-        this.containers = this.searchContainers();
-        if (this.containers.isEmpty()) {
+        List<PathAnnotationObject> allContainers = this.searchContainers();
+        if (allContainers.isEmpty()) {
+            this.containers = allContainers;
             this.bbh = new BoundingBoxHierarchy(new ArrayList<>(), BBH_MAX_DEPTH);
             return;
         }
+        List<PathAnnotationObject> oldContainers = allContainers.stream()
+                .filter(c -> this.containers.contains(c)).toList();
+        List<PathAnnotationObject> newContainers = allContainers.stream()
+                .filter(c -> !this.containers.contains(c)).toList();
+        for (PathAnnotationObject oldContainer: oldContainers) {
+            ROI oldROI = oldContainer.getROI();
+            Geometry oldGeom = oldROI.getGeometry();
+            ImagePlane oldPlane = oldROI.getImagePlane();
+            for (PathAnnotationObject newContainer: newContainers) {
+                ROI c2ROI = newContainer.getROI();
+                Geometry newGeom = c2ROI.getGeometry();
+                if (oldGeom.intersects(newGeom)) {
+                    ROI intersection = GeometryTools.geometryToROI(oldGeom.intersection(newGeom), oldPlane);
+                    List<PathDetectionObject> newDetections = this.getChildrenDetections(newContainer).toList(); //collect(Collectors.toSet());
+                    BoundingBoxHierarchy newDetectionsBBH = new BoundingBoxHierarchy(newDetections, BBH_MAX_DEPTH);
+                    List<PathDetectionObject> oldDetections = AbstractDetections.getDetectionsInside(intersection, hierarchy)     // it's a detection inside a new container
+                            .filter(oldDetection -> this.isChannelDetection(oldDetection, true) && !newDetectionsBBH.contains(oldDetection))
+                            .toList();
+                    hierarchy.removeObjects(oldDetections, false);
+                    newDetections.stream()
+                            .filter( newDetection -> oldROI.contains(newDetection.getROI().getCentroidX(), newDetection.getROI().getCentroidY()))
+                            .forEach( newDetection -> this.hierarchy.addObjectBelowParent(oldContainer, newDetection, false) );
+                    ROI newDiffOld = GeometryTools.geometryToROI(newGeom.difference(oldGeom), oldPlane);
+                    newContainer.setROI(newDiffOld);
+                }
+            }
+        }
+        ListIterator<PathAnnotationObject> iterator = allContainers.listIterator();
+        while (iterator.hasNext()) {
+            PathAnnotationObject c = iterator.next();
+            if (c.getROI().isEmpty()) {
+                hierarchy.removeObject(c, false);
+                iterator.remove();
+            }
+        }
+        this.hierarchy.fireHierarchyChangedEvent(this);
+        this.containers = allContainers;
+
         List<PathDetectionObject> cells = this.getContainersDetections(false); // throw NoCellContainersFoundException
         this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);
     }
@@ -101,7 +156,8 @@ public abstract class AbstractDetections {
         return this.hierarchy.getAnnotationObjects().stream()
                 .filter(this::isContainer)
                 .map(a -> (PathAnnotationObject) a)
-                .toList();
+                .collect(Collectors.toList());  // mutable list
+                // .toList();                   // immutable list
     }
 
     /**
@@ -326,51 +382,6 @@ public abstract class AbstractDetections {
                 && this.getContainersName().equals(other.getContainersName())
                 && this.hierarchy.equals(other.hierarchy)
                 && new HashSet<>(this.detectionClasses).equals(new HashSet<>(other.detectionClasses));
-    }
-
-    /**
-     * Adds the detections from another {@link AbstractDetections} into the current instance's containers.
-     * It is relevant only when {@code other} is constructed after the current instance, and the current instance is not
-     * yet synchronized with {@link #fireUpdate()}.<br>
-     * All current containers that overlap with {@code other}'s containers, get updated with the newest provided detections.
-     * In the end, the two  {@link AbstractDetections} will be functionally the same.
-     * @param other the detections to add to the current instance
-     * @throws IncompatibleDetections when {@code other}'s detection cannot be added to the current instance
-     * @throws NoCellContainersFoundException when no container is found in both instances
-     * @see #isCompatibleWith(AbstractDetections)
-     * @see #fireUpdate()
-     */
-    public void addAll(AbstractDetections other) throws IncompatibleDetections, NoCellContainersFoundException {
-        if (this == other || this.equals(other))
-            return;
-        if (!this.isCompatibleWith(other))
-            throw new IncompatibleDetections(this, other);
-
-        // REMOVE ALL OLD DETECTIONS COVERED BY `other`, IF ANY
-        other.containers.stream()
-                .filter(c -> !this.containers.contains(c))                                                          // get new containers only
-                .forEach(c -> {
-                    List<PathDetectionObject> oldDetections = AbstractDetections.getDetectionsInside(c, hierarchy)  // it's a detection inside a new container
-                            .filter(detection -> this.isChannelDetection(detection, true)                           // it's a compatible detection
-                                    && other.getOverlappingObjectIfPresent(detection).orElse(null) != detection)    // but it not part of `other`'s internal representation (i.e. it's not a new detection)
-                            .toList();
-                    hierarchy.removeObjects(oldDetections, false);
-                });
-        // ADD ALL NEW DETECTIONS
-        for (PathAnnotationObject outerContainer: this.containers) {
-            other.toStream()
-                    .filter( detection -> outerContainer.getROI().contains(detection.getROI().getCentroidX(), detection.getROI().getCentroidY()))
-                    .forEach( detection -> this.hierarchy.addObjectBelowParent(outerContainer, detection, false) );
-        }
-        // REMOVE EMPTY CONTAINERS, IF ANY
-        other.hierarchy.removeObjects(
-                other.containers.stream().filter(c -> c.getChildObjects().isEmpty()).toList(),
-                false
-        );
-        this.hierarchy.fireHierarchyChangedEvent(this);
-        // ADD ALL DETECTION IN NEW CONTAINERS
-        this.fireUpdate();
-        other.fireUpdate();
     }
 
     /**
