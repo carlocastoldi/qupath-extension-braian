@@ -78,6 +78,7 @@ class BoundingBoxHierarchyTest {
         assertNull(bbh.getOverlappingObject(object));
         assertTrue(bbh.toStream().toList().isEmpty());
         assertTrue(bbh.getBox().isEmpty());
+        assertFalse(bbh.contains(object));
         assertEquals(-1, bbh.getDepth());
     }
 
@@ -109,19 +110,27 @@ class BoundingBoxHierarchyTest {
         List<PathObject> objects = Collections.singletonList(empty);
         BoundingBoxHierarchy bbh = new BoundingBoxHierarchy(objects);
 
+        assertTrue(objects.stream().allMatch(bbh::contains));
         PathObject cover = createObject(0, 0, 2, 2);
+        assertFalse(bbh.contains(cover));
         assertEquals(empty, bbh.getOverlappingObject(cover));
         PathObject bottomEdge = createObject(0, 1, 2, 2);
+        assertFalse(bbh.contains(bottomEdge));
         assertEquals(empty, bbh.getOverlappingObject(bottomEdge));
         PathObject leftEdge = createObject(1, 0, 2, 2);
+        assertFalse(bbh.contains(leftEdge));
         assertEquals(empty, bbh.getOverlappingObject(leftEdge));
         PathObject rightEdge = createObject(-1, 0, 2, 2);
+        assertFalse(bbh.contains(rightEdge));
         assertNull(bbh.getOverlappingObject(rightEdge));
         PathObject topEdge = createObject(0, -2, 2, 2);
+        assertFalse(bbh.contains(topEdge));
         assertNull(bbh.getOverlappingObject(topEdge));
         PathObject emptyAreaButOverlapping = createObject(1, 1, 0, 0);
+        assertFalse(bbh.contains(emptyAreaButOverlapping));
         assertEquals(empty, bbh.getOverlappingObject(emptyAreaButOverlapping));
         PathObject singlePointButOverlapping = createObject(PathAnnotationObject.class, ROIs.createPointsROI(1, 1, ImagePlane.getDefaultPlane()));
+        assertFalse(bbh.contains(singlePointButOverlapping));
         assertEquals(empty, bbh.getOverlappingObject(singlePointButOverlapping));
     }
 
@@ -170,6 +179,7 @@ class BoundingBoxHierarchyTest {
         Collection<PathObject> objects = createObjectGrid(n, 1, size).toList();
         BoundingBoxHierarchy bbh = new BoundingBoxHierarchy(objects, 10);
 
+        assertTrue(objects.stream().allMatch(bbh::contains));
         assertEquals(depth, bbh.getDepth());
         assertEquals(new Rectangle(0, 0, n*size, size), bbh.getBox());
         assertEquals(new HashSet<>(objects), bbh.toStream().collect(Collectors.toSet()));

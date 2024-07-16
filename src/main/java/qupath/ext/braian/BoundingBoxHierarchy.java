@@ -20,6 +20,7 @@ interface BoundingBox {
     int getDepth();
     Stream<PathObject> toStream();
     Optional<PathObject> getOverlappingObjectIfPresent(PathObject object);
+    boolean contains(PathObject object);
 }
 
 class BVHNode implements BoundingBox {
@@ -64,6 +65,11 @@ class BVHNode implements BoundingBox {
     }
 
     @Override
+    public boolean contains(PathObject other) {
+        return this.po == other;
+    }
+
+    @Override
     public Rectangle2D getBox() {
         return this.bbox;
     }
@@ -94,7 +100,7 @@ public class BoundingBoxHierarchy implements BoundingBox {
      * of hierarchy.
      * @param objects the given objects to insert into the hierarchy
      */
-    public BoundingBoxHierarchy(Collection<PathObject> objects) {
+    public BoundingBoxHierarchy(Collection<? extends PathObject> objects) {
         this(objects, 6);
     }
 
@@ -172,6 +178,22 @@ public class BoundingBoxHierarchy implements BoundingBox {
     public PathObject getOverlappingObject(PathObject object) {
         // TODO: rename to getObjectOverlappingCentroid
         return this.getOverlappingObjectIfPresent(object).orElse(null);
+    }
+
+    @Override
+    public boolean contains(PathObject object) {
+        if(this.isEmpty()) // if the BBH is empty
+            return false;
+        ROI objectRoi = object.getROI();
+        if (!objectRoi.isPoint() && !objectRoi.isEmpty()) {
+            double poX = objectRoi.getBoundsX();
+            double poY = objectRoi.getBoundsY();
+            double poW = objectRoi.getBoundsWidth();
+            double poH = objectRoi.getBoundsHeight();
+            if (!this.bbox.intersects(poX, poY, poW, poH) && !this.bbox.isEmpty())
+                return false;
+        }
+        return this.children.stream().anyMatch(bvh -> bvh.contains(object));
     }
 
     /**
