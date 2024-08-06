@@ -7,6 +7,7 @@ package qupath.ext.braian;
 import qupath.ext.braian.utils.BraiAn;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.measure.ObservableMeasurementTableData;
+import qupath.lib.images.servers.PixelCalibration;
 import qupath.lib.objects.PathAnnotationObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectTools;
@@ -87,7 +88,7 @@ public class AtlasManager {
 
     private static List<String> getDetectionsMeasurements(List<AbstractDetections> detections) {
         // TODO: should avoid resorting to QP to get the server metadata
-        var cal = QP.getCurrentServer().getMetadata().getPixelCalibration();
+        PixelCalibration cal = QP.getCurrentImageData().getServerMetadata().getPixelCalibration();
         if (!um.equals(cal.getPixelWidthUnit()) || !um.equals(cal.getPixelHeightUnit()))
             throw new RuntimeException("FAILED to export results. Expected image pixel units to be in 'µm', instead got them in '"+
                     cal.getPixelWidthUnit()+"' and '"+cal.getPixelWidthUnit()+"'. Try setting it with setPixelSizeMicrons()");
