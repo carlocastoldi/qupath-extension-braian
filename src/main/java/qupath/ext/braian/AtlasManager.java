@@ -113,7 +113,7 @@ public class AtlasManager {
     }
 
     /**
-     * Flattens the atlas's ontology into a list of annotations.
+     * Flattens the atlas ontology into a list of annotations.
      * If the atlas hierarchy was modified by adding {@link AbstractDetections}'s containers,
      * it filters them from the current brain hierarchy.
      * <br>
@@ -130,8 +130,8 @@ public class AtlasManager {
     }
 
     /**
-     * Saves a TSV file containing data for each bran region of the atlas.
-     * Namely, Image name, brain region name, hemisphere, area in µm², number of detection for each of the given types
+     * Saves a TSV file containing data for each brain region of the atlas.
+     * Namely, Image name, brain region name, hemisphere, area in µm², number of detections for each of the given types
      * @param detections the list of detection of which to gather the data for each region
      * @param file the file where it should write to. Note that if the file exists, it will be overwritten
      */
