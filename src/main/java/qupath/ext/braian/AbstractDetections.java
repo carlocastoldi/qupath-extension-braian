@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 
 /**
  * This abstract class defines the interface to handle groups of different cell detections groups.
- * It works by using on "container" annotations, in which all the cells are grouped inside.
+ * It works by using on "container" annotations, inside which all the cells are grouped.
  * By default, {@link AbstractDetections} allows to classify its detections by applying {@link PartialClassifier}s.
  */
 public abstract class AbstractDetections {
@@ -30,7 +30,7 @@ public abstract class AbstractDetections {
 
     /**
      * returns the detections inside the given annotation
-     * @param annotation where the to search the detection inside
+     * @param annotation where to search the detections 
      * @param hierarchy where to find the detections
      * @return a stream of detections found inside annotations
      */
@@ -40,7 +40,7 @@ public abstract class AbstractDetections {
 
     /**
      * returns the detections inside the given {@link ROI}
-     * @param roi where the to search the detection inside
+     * @param roi where to search the detection 
      * @param hierarchy where to find the detections
      * @return a stream of detections found inside annotations
      */
@@ -150,10 +150,10 @@ public abstract class AbstractDetections {
     }
 
     /**
-     * If there is no detection within the current instance.
+     * If there are no detections within the current instance.
      * <br>
      * If the state was changed outside of this extension, you might need to call {@link #fireUpdate()} first.
-     * @return True, if no detection is found within the current state. False otherwise.
+     * @return True, if no detections are found within the current state. False otherwise.
      * @see #fireUpdate()
      */
     public boolean isEmpty() {
@@ -248,7 +248,7 @@ public abstract class AbstractDetections {
     }
 
     /**
-     * checks whether the given object is a detections belonging to the instance kind or not
+     * checks whether the given object is a detection belonging to the instance kind
      * @param o the object to test
      * @param all if true, considers discarded detections also as belonging to the instance kind
      * @return true if the given object belongs to the instance kind
@@ -277,7 +277,7 @@ public abstract class AbstractDetections {
     }
 
     /**
-     * Creates a duplicate child annotation to use as container
+     * Creates a duplicate child annotation to be used as container
      * @param containerParent the annotation to use as a model for the container
      * @param overwrite if true, deletes all previously created containers, if any
      * @return the new container, as child of <code>containerParent</code>
@@ -306,7 +306,7 @@ public abstract class AbstractDetections {
     }
 
     /**
-     * applies a list of classifiers in sequence ot the detections of the instance kind.
+     * applies a list of classifiers in sequence to the detections of the instance kind.
      * The order of the classifiers is important. If they work on overlapping annotations, the intersection is classified using the latter classifier.
      * <br>
      * If a classifier's output is not compatible with the instance, the corresponding {@link PartialClassifier} will be skipped.
@@ -398,7 +398,7 @@ public abstract class AbstractDetections {
     }
 
     /**
-     * Two detection objects are the functionally same if they are compatible with each other and they have the same containers
+     * Two detection objects are functionally the same if they are compatible with each other and they have the same containers
      * @param obj
      * @return True, if they are functionally the same. False otherwise
      * @see #isCompatibleWith(AbstractDetections)
