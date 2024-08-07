@@ -8,7 +8,8 @@ SPDX-License-Identifier: CC0-1.0
 [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carlocastoldi/qupath-extension-braian/badges/.github/badges/jacoco.json)](https://carlocastoldi.github.io/qupath-extension-braian/coverage/)
 [![branches coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carlocastoldi/qupath-extension-braian/badges/.github/badges/branches.json)](https://carlocastoldi.github.io/qupath-extension-braian/coverage/)
 
-Extends QuPath's functionalities for whole-brain data extraction. It works best if coupled with:
+Extends QuPath's functionalities for whole-brain image analysis and quantification. For example it streamlines automatic cell segmentation of multiple markers and computes markers overlap within the CCFv3 atlas previously aligned on your sections. 
+It works best if coupled with:
 * [`qupath-extension-abba`](https://github.com/biop/qupath-extension-abba): for importing importing brain atlas annotations from [ABBA](https://go.epfl.ch/abba)
 * [`braian`](https://codeberg.org/SilvaLab/BraiAn): the associated python library for whole-brain analysis and visualization
 
@@ -19,10 +20,9 @@ I suggest you to listen to "[Brianstorm](https://en.wikipedia.org/wiki/Brianstor
 
 ## Features
 
-This extension helps you managing multiple QuPath projects with the same parameters.
+This extension helps you manage multiple QuPath projects ensuring consistency. In particular, it is designed to perform batch analysis across many QuPath projects in an automated manner. Typically, in whole-brain datasets, one brain = one QuPath project and BraiAn makes sure the exact same analysis parameters are consistently applied across different projects.
 It was first developed to work with [ABBA](https://go.epfl.ch/abba), but can be used for other purposes as well.
-Its core idea is to move _outside_ of scripts' code the input parameters used to analyse multiple QP projects of the same cohort/experiment.
-This allows to have a reproducible configuration that can be shared, backed up and ran after long periods of time.
+Its core idea is to move the input parameters used to analyse multiple QuPath projects of the same cohort/experiment _outside_ of scripts' code. This allows having a reproducible configuration that can be shared, backed up and ran after long periods of time.
 
 The extensions exposes a proper library [API](https://carlocastoldi.github.io/qupath-extension-braian/docs/) and, among all, it allows to:
 - work with image channel histograms, thanks to `ChannelHistogram.class`
@@ -30,7 +30,7 @@ The extensions exposes a proper library [API](https://carlocastoldi.github.io/qu
 - apply different classifiers on different subsets of detections, thanks to `PartialClassifier.class`
 - _quickly_ find all detections that are double—or triple/multiple—positive, thanks to `BoundingBoxHierarchy.class`
 - tag certain brain regions to be excluded from further analysis due to tissue, imaging or alignment problems
-- export to file the number of detections/double+ found in each brain region
+- export to file the quantification results (number of detections/double+ found in each brain region)
 - export to file a list of regions flagged to be excluded
 
 Where to start from, though? Reading [this script](https://github.com/carlocastoldi/qupath-extension-braian/blob/master/src/main/resources/scripts/compute_classify_overlap_export_exclude_detections.groovy) and the associated [config file](https://github.com/carlocastoldi/qupath-extension-braian/blob/master/BraiAn.yml) is a good start!
