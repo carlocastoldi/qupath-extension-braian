@@ -30,7 +30,7 @@ public abstract class AbstractDetections {
 
     /**
      * returns the detections inside the given annotation
-     * @param annotation where to search the detections 
+     * @param annotation where to search the detections
      * @param hierarchy where to find the detections
      * @return a stream of detections found inside annotations
      */
@@ -40,7 +40,7 @@ public abstract class AbstractDetections {
 
     /**
      * returns the detections inside the given {@link ROI}
-     * @param roi where to search the detection 
+     * @param roi where to search the detections
      * @param hierarchy where to find the detections
      * @return a stream of detections found inside annotations
      */
