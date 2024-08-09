@@ -8,8 +8,8 @@ plugins {
     // To create a shadow/fat jar that bundle up all dependencies
     id "com.github.johnrengelman.shadow" version "8.1.1"
     // Include this plugin to avoid downloading JavaCPP dependencies for all platforms
-    id "org.bytedeco.gradle-javacpp-platform"
-    id "org.openjfx.javafxplugin" version "0.1.0"
+    // alias libs.plugins.javacpp
+    alias libs.plugins.javafx
 }
 
 ext.moduleName = "qupath.extension.braian"
@@ -19,12 +19,26 @@ base {
     description = "QuPath extension for whole-brain data extraction"
 }
 ext.qupathVersion = gradle.ext.qupathVersion
-ext.qupathJavaVersion = 17
+ext.qupathJavaVersion = 21
+
+javafx {
+    version = "22.0.1"
+    modules = [ 'javafx.controls' ]
+}
 
 dependencies {
     // Main QuPath user interface jar.
     // Automatically includes other QuPath jars as subdependencies.
-    shadow "io.github.qupath:qupath-gui-fx:$qupathVersion"
+    // shadow files("/home/castoldi/.gradle/caches/modules-2/files-2.1/org.openjfx/javafx-base/22.0.2/c831bf8045cac41e9501454e658e61a1bdc1f3e/javafx-base-22.0.2-linux.jar")
+    shadow files("../qupath-core/build/libs/qupath-core-0.6.0-SNAPSHOT.jar")
+    shadow files("../qupath-core-processing/build/libs/qupath-core-processing-0.6.0-SNAPSHOT.jar")
+    shadow files("../qupath-extension-processing/build/libs/qupath-extension-processing-0.6.0-SNAPSHOT.jar")
+    shadow files("../qupath-gui-fx/build/libs/qupath-gui-fx-0.6.0-SNAPSHOT.jar")
+    api libs.imagej
+    api libs.jts
+    api libs.controlsfx
+
+    // shadow "io.github.qupath:qupath-gui-fx:$qupathVersion"
     shadow libs.slf4j
     // For JavaFX
     shadow libs.qupath.fxtras
