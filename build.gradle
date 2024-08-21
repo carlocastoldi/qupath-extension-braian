@@ -29,7 +29,6 @@ javafx {
 dependencies {
     // Main QuPath user interface jar.
     // Automatically includes other QuPath jars as subdependencies.
-    // shadow files("/home/castoldi/.gradle/caches/modules-2/files-2.1/org.openjfx/javafx-base/22.0.2/c831bf8045cac41e9501454e658e61a1bdc1f3e/javafx-base-22.0.2-linux.jar")
     shadow files("../qupath-core/build/libs/qupath-core-0.6.0-SNAPSHOT.jar")
     shadow files("../qupath-core-processing/build/libs/qupath-core-processing-0.6.0-SNAPSHOT.jar")
     shadow files("../qupath-extension-processing/build/libs/qupath-extension-processing-0.6.0-SNAPSHOT.jar")
