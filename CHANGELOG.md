@@ -6,6 +6,7 @@ SPDX-License-Identifier: CC0-1.0
 # Version v1.0.3-SNAPSHOT
 This is a work in progress for the next release.
 ## Enhancements
+ - documentation update
 ## Bugs fixed
 ## API changes
 ## Dependency updates

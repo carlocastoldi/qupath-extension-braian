@@ -131,7 +131,8 @@ public class AtlasManager {
 
     /**
      * Saves a TSV file containing data for each brain region of the atlas.
-     * Namely, Image name, brain region name, hemisphere, area in µm², number of detections for each of the given types
+     * Namely, Image name, brain region name, hemisphere, area in µm², number of detections for each of the given types.
+     * The table is saved as a CSV (comma-separated values) file if 'file' ends with ".csv"
      * @param detections the list of detection of which to gather the data for each region
      * @param file the file where it should write to. Note that if the file exists, it will be overwritten
      */
