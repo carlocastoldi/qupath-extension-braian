@@ -2,7 +2,9 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
-# This is a configuration file for BraiAn, a QuPath extension for managing multiple projects with the same parameters
+# This is a configuration file for BraiAn, a extension helps managing multiple QuPath projects ensuring consistency.
+# Typically, in whole-brain datasets, one brain = one QuPath project and BraiAn makes sure the exact same analysis parameters are
+# consistently applied across different projects.
 # It is meant to be placed either in a QuPath project folder, or in its parent directory.
 # Ideally, the parent directory contains multiple QP projects for which the same parameteres are used in the analysis.
 # If a value is not defined in the YAML, BraiAn will apply a default value.
