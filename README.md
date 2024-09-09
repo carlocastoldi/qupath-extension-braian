@@ -8,10 +8,10 @@ SPDX-License-Identifier: CC0-1.0
 [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carlocastoldi/qupath-extension-braian/badges/.github/badges/jacoco.json)](https://carlocastoldi.github.io/qupath-extension-braian/coverage/)
 [![branches coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carlocastoldi/qupath-extension-braian/badges/.github/badges/branches.json)](https://carlocastoldi.github.io/qupath-extension-braian/coverage/)
 
-Extends QuPath's functionalities for whole-brain image analysis and quantification. For example it streamlines automatic cell segmentation of multiple markers and computes markers overlap within the CCFv3 atlas previously aligned on your sections. 
+Extends QuPath's functionalities for image analysis of serial brain sections across many animals. It is designed for multichannel cell segmentation across large and variable datasets and ensures consistency in image analysis across large datasets. This module leverages QuPath's built-in algorithms to provide a multi-channel, whole-brain optimised object detection pipeline. BraiAnDetect features options for refining signal quantification, including machine learning-based object classification, region specific cell segmentation, multiple marker co-expression algorithms and an interface for selective exclusion of damaged tissue portions.
 It works best if coupled with:
 * [`qupath-extension-abba`](https://github.com/biop/qupath-extension-abba): for importing importing brain atlas annotations from [ABBA](https://go.epfl.ch/abba)
-* [`braian`](https://codeberg.org/SilvaLab/BraiAn): the associated python library for whole-brain analysis and visualization
+* [`braian`](https://silvalab.codeberg.page/BraiAn/): the associated python library for whole-brain analysis and visualization
 
 YSK: BraiAn's names stands for _**Brai**n **An**alysis_.
 
@@ -20,15 +20,16 @@ I suggest you to listen to "[Brianstorm](https://en.wikipedia.org/wiki/Brianstor
 
 ## Features
 
-This extension helps you manage multiple QuPath projects ensuring consistency. In particular, it is designed to perform batch analysis across many QuPath projects in an automated manner. Typically, in whole-brain datasets, one brain = one QuPath project and BraiAn makes sure the exact same analysis parameters are consistently applied across different projects.
+This extension helps you manage image analysis across multiple QuPath projects ensuring consistency. In particular, it is designed to perform batch analysis across many QuPath projects in an automated manner. Typically, in whole-brain datasets, one brain = one QuPath project and BraiAn makes sure the exact same analysis parameters are consistently applied across different projects.
 It was first developed to work with [ABBA](https://go.epfl.ch/abba), but can be used for other purposes as well.
-Its core idea is to move the input parameters used to analyse multiple QuPath projects of the same cohort/experiment _outside_ of scripts' code. This allows having a reproducible configuration that can be shared, backed up and ran after long periods of time.
+Its core idea is to move the input image analysis parameters used to analyse multiple QuPath projects of the same cohort/experiment _outside_ of scripts' code (in a [YAML](https://en.wikipedia.org/wiki/YAML) configuration file, see below). This allows having a reproducible configuration that can be shared, backed up and ran after long periods of time.
 
-The extensions exposes a proper library [API](https://carlocastoldi.github.io/qupath-extension-braian/docs/) and, among all, it allows to:
-- work with image channel histograms, thanks to `ChannelHistogram.class`
-- compute and manage detections separately for each image channel, thanks to `AbstractDetections.class`
-- apply different classifiers on different subsets of detections, thanks to `PartialClassifier.class`
-- _quickly_ find all detections that are double—or triple/multiple—positive, thanks to `BoundingBoxHierarchy.class`
+The extensions exposes a proper library [API](https://carlocastoldi.github.io/qupath-extension-braian/docs/). Here are some examples. It allows you to:
+
+- multi-channel automatic object segmentation (e.g. [cell detections](https://carlocastoldi.github.io/qupath-extension-braian/docs/qupath/ext/braian/AbstractDetections.html))
+- machine-learning-based [object classification](https://carlocastoldi.github.io/qupath-extension-braian/docs/qupath/ext/braian/PartialClassifier.html) (e.g. apply custom classifiers on different detection types).
+- co-localization analysis (i.e. _quickly_ find all detections that are double—or triple/multiple—positive, through [`BoundingBoxHierarchy`](https://carlocastoldi.github.io/qupath-extension-braian/docs/qupath/ext/braian/BoundingBoxHierarchy.html))
+- fine tune image analysis using [channel histograms](https://carlocastoldi.github.io/qupath-extension-braian/docs/qupath/ext/braian/ChannelHistogram.html)
 - tag certain brain regions to be excluded from further analysis due to tissue, imaging or alignment problems
 - export to file the quantification results (number of detections/double+ found in each brain region)
 - export to file a list of regions flagged to be excluded
@@ -37,24 +38,19 @@ Where to start from, though? Reading [this script](https://github.com/carlocasto
 
 ## Citing
 
-**Soon.**
+If you use BraiAn in your work, please cite the paper below, currently in pre-print:
 
-Keep an eye on this or [ABBA](https://github.com/biop/qupath-extension-abba)'s repositories!\
-_ETA_: June 2024
+> [!IMPORTANT]
+> Chiaruttini, N., Castoldi, C. et al. **ABBA, a novel tool for whole-brain mapping, reveals brain-wide differences in immediate early genes induction following learning**. _bioRxiv_ (2024).
+> [https://doi.org/10.1101/2024.09.06.611625](https://doi.org/10.1101/2024.09.06.611625)
 
 ## Contributing
 
-I decided to publish the BraiAn pipeline (i.e. this QuPath extension and the subsequent [python libray](https://codeberg.org/SilvaLab/BraiAn)) with the most libre licence possible because I find maximum value in learning from others
-and sharing my own—small—knowledge.
+We decided to publish the BraiAn pipeline (i.e. this QuPath extension and the twin [python libray](https://codeberg.org/SilvaLab/BraiAn)) with the most libre licence possible because we find maximum value in learning from others and sharing our own—small—knowledge.
 
-We, developers in neuroscience, are islands that often work alone and frequently end up reinventing the wheel rather 
-then spending time finding, pickup up and adapting the work that somebody on the other side of the world did with no
-intention to publish. For this reason I spent a great amount of my personal time making this extension as
-usable, extensible, and long-lasting as I could. And yet, I know it could be better, that there could be bugs,
-unforeseen scenarios and missing features.
+We, developers in neuroscience, are islands that often work alone and frequently end up reinventing the wheel rather then spending time finding, pickup up and adapting the work that somebody, from the other side of the world, did with no intention to publish. For this reason we spent a great amount of our personal time making the modules as usable, extensible, and long-lasting as we could. And yet, we know it could be better, that there could be bugs, unforeseen scenarios and missing features.
 
-For this reason I hope that if you find my work useful, you will find time and will to contribute back upstream with
-issues, PRs, documentation, tests, feature requests... _Any_ activity makes me happy!
+For this reason we hope that, _if you find our work useful_, you will find time and will to contribute back upstream with issues, PRs, documentation, tests, feature requests... _Any_ activity makes us happy!
 
 ## Building
 
