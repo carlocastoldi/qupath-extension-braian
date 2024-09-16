@@ -73,7 +73,7 @@ public class ImageChannelTools {
     /**
      * Computes the {@link ImageStatistics} of the current channel at the given resolution.
      * @param resolutionLevel Resolution level, If it's bigger than {@link ImageServer#nResolutions()}-1,
-     *                        than it uses the igven n-th resolution.
+     *                        than it uses the given n-th resolution.
      * @return the statistics of the channel computed by ImageJ at the given resolution
      * @throws IOException when it fails to read the image file
      * @see #getChannelStats(int)

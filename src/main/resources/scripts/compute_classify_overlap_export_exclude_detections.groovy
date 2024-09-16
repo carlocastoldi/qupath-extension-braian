@@ -78,7 +78,7 @@ if (AtlasManager.isImported(hierarchy)) {
     var atlas = new AtlasManager(hierarchy)
     var imageName = getProjectEntry().getImageName().replace("/", "-")
 
-    var resultsFile = new File(buildPathInProject("results", imageName + "_regions.txt")) // TODO: should be .tsv or .csv
+    var resultsFile = new File(buildPathInProject("results", imageName + "_regions.tsv")) // TODO: should be .tsv or .csv
     atlas.saveResults(allDetections + overlaps, resultsFile)
 
     def exclusionsFile = new File(buildPathInProject("regions_to_exclude", imageName + "_regions_to_exclude.txt"))

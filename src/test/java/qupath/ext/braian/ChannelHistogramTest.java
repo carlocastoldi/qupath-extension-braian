@@ -165,11 +165,3 @@ public class ChannelHistogramTest {
     }
 
 }
-
-// python3
-/*
-from scipy.signal import filtfilt
-from scipy.signal import find_peaks
-x_ = filtfilt(np.ones(14) / 14, 1, x)
-find_peaks(x_, prominence=180)[0]
-*/
