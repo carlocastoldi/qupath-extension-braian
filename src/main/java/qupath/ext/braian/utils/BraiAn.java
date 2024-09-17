@@ -29,6 +29,14 @@ public class BraiAn {
         return Optional.empty();
     }
 
+    /**
+     * It searches for a file accordingly to BraiAn specifics: it first searches it in the project's path;
+     * if it is not present, it searches it in the parent directory, were supposedly other QuPath projects of the
+     * same experiment reside.
+     * @param fileName the name of the file to search accordingly to BraiAn
+     * @return the complete path to <code>fileName</code>.
+     * @throws FileNotFoundException if no file named <code>fileName</code> was found.
+     */
     public static Path resolvePath(String fileName) throws FileNotFoundException {
         return resolvePathIfPresent(fileName)
                 .orElseThrow(() -> new FileNotFoundException("Can't find the specified file: '"+fileName+"'"));

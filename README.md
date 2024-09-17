@@ -10,7 +10,7 @@ SPDX-License-Identifier: CC0-1.0
 
 Extends QuPath's functionalities for image analysis of serial brain sections across many animals. It is designed for multichannel cell segmentation across large and variable datasets and ensures consistency in image analysis across large datasets. This module leverages QuPath's built-in algorithms to provide a multi-channel, whole-brain optimised object detection pipeline. BraiAnDetect features options for refining signal quantification, including machine learning-based object classification, region specific cell segmentation, multiple marker co-expression algorithms and an interface for selective exclusion of damaged tissue portions.
 It works best if coupled with:
-* [`qupath-extension-abba`](https://github.com/biop/qupath-extension-abba): for importing importing brain atlas annotations from [ABBA](https://go.epfl.ch/abba)
+* [`qupath-extension-abba`](https://github.com/biop/qupath-extension-abba): for importing brain atlas annotations from [ABBA](https://go.epfl.ch/abba)
 * [`braian`](https://silvalab.codeberg.page/BraiAn/): the associated python library for whole-brain analysis and visualization
 
 YSK: BraiAn's names stands for _**Brai**n **An**alysis_.

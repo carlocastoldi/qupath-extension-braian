@@ -14,7 +14,8 @@ import java.util.List;
 /**
  * Creates a classifier to apply to an instance of {@link AbstractDetections}
  * @param classifier an object classifier
- * @param annotations the annotations to which solely apply the <code>classifier</code> to the contained detections
+ * @param annotations the annotations to which contained detection solely apply the <code>classifier</code>.
+ *                    If <code>null</code>, it applies it to the whole image.
  * @see AbstractDetections#applyClassifiers(List, ImageData)
  */
 public record PartialClassifier(ObjectClassifier<?> classifier, Collection<PathAnnotationObject> annotations) {
