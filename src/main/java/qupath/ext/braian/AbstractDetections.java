@@ -76,6 +76,8 @@ public abstract class AbstractDetections {
         this.hierarchy = hierarchy;
         this.id = id;
         this.detectionClasses = detectionClasses.stream().toList();
+        for (PathClass classification: this.detectionClasses)
+            BraiAn.populatePathClassGUI(classification);
         this.fireUpdate();
     }
 
@@ -299,7 +301,6 @@ public abstract class AbstractDetections {
         PathAnnotationObject duplicate = (PathAnnotationObject) PathObjectTools.transformObject(containerParent,null, true, true);
         duplicate.setName(name);
         duplicate.setPathClass(classification);
-        BraiAn.populatePathClassGUI(classification);
         this.hierarchy.addObjectBelowParent(containerParent, duplicate, true);
         duplicate.setLocked(true);
         return duplicate;
