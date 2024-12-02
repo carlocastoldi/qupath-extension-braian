@@ -83,15 +83,14 @@ public class ImageChannelTools {
         double downsample = this.server.getDownsampleForResolution(Math.min(this.server.nResolutions()-1, resolutionLevel));
         RegionRequest request = RegionRequest.createInstance(this.server, downsample);
         PathImage<ImagePlus> pathImage = IJTools.convertToImagePlus(this.server, request);
-        CompositeImage ci = (CompositeImage) pathImage.getImage();
+        ImagePlus ci = pathImage.getImage();
 
         int ijChannel = this.nChannel+1; // ij.CompositeImage uses 1-based channels
         ci.setC(ijChannel);
         ImageProcessor ip = ci.getChannelProcessor();
         ip = ip.duplicate();
         ip.resetRoi();
-        ImageStatistics stats = ip.getStats();
-        return stats;
+        return ip.getStats();
     }
 
     /**
