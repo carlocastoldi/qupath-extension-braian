@@ -29,6 +29,7 @@ import qupath.ext.braian.config.ProjectsConfig
 import static qupath.lib.scripting.QP.*
 
 var imageData = getCurrentImageData()
+// unless explicitly needed, from QuPath 0.6.* avoid calling imageData.getServer(). It makes scripts considerably slower
 var server = imageData.getServer()
 var hierarchy = imageData.getHierarchy()
 var config = ProjectsConfig.read("BraiAn.yml")
@@ -78,7 +79,7 @@ if (AtlasManager.isImported(hierarchy)) {
     var atlas = new AtlasManager(hierarchy)
     var imageName = getProjectEntry().getImageName().replace("/", "-")
 
-    var resultsFile = new File(buildPathInProject("results", imageName + "_regions.tsv"))
+    var resultsFile = new File(buildPathInProject("results", imageName + "_regions.tsv")) // can be .csv too
     atlas.saveResults(allDetections + overlaps, resultsFile)
 
     def exclusionsFile = new File(buildPathInProject("regions_to_exclude", imageName + "_regions_to_exclude.txt"))
