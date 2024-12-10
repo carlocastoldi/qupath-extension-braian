@@ -12,7 +12,6 @@ import qupath.lib.objects.*;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.regions.ImagePlane;
-import qupath.lib.roi.GeometryROI;
 import qupath.lib.roi.GeometryTools;
 import qupath.lib.roi.interfaces.ROI;
 
@@ -116,7 +115,7 @@ public abstract class AbstractDetections {
             Geometry newGeom = newContainer.getROI().getGeometry();
             if (oldGeom.intersects(newGeom)) {
                 ROI intersection = GeometryTools.geometryToROI(oldGeom.intersection(newGeom), oldPlane);
-                List<PathDetectionObject> newDetections = this.getChildrenDetections(newContainer).toList(); //collect(Collectors.toSet());
+                List<PathDetectionObject> newDetections = getChildrenDetections(newContainer).toList(); //collect(Collectors.toSet());
                 this.removeOldDetections(intersection, newDetections);
                 this.addUpdatedDetections(oldContainer, newDetections);
                 ROI newDiffOld = GeometryTools.geometryToROI(newGeom.difference(oldGeom), oldPlane);
@@ -316,12 +315,12 @@ public abstract class AbstractDetections {
      * @see AbstractDetections#getDetectionsPathClasses()
      * @see AbstractDetections#getDiscardedDetectionsPathClass()
      */
-    public void applyClassifiers(List<PartialClassifier> classifiers, ImageData<?> imageData) {
+    public <T> void applyClassifiers(List<PartialClassifier<T>> classifiers, ImageData<T> imageData) {
         classifiers = removeUselessClassifiers(classifiers);
         List<PathDetectionObject> cells = new ArrayList<>();
         try {
-            for (PartialClassifier partialClassifier : classifiers) {
-                ObjectClassifier classifier = partialClassifier.classifier();
+            for (PartialClassifier<T> partialClassifier : classifiers) {
+                ObjectClassifier<T> classifier = partialClassifier.classifier();
                 Collection<PathAnnotationObject> toClassify = partialClassifier.annotations();
                 try {
                     cells.addAll(this.classifyInside(classifier, toClassify, imageData));
@@ -336,7 +335,7 @@ public abstract class AbstractDetections {
         }
     }
 
-    private static List<PartialClassifier> removeUselessClassifiers(List<PartialClassifier> partialClassifiers) {
+    private static <T> List<PartialClassifier<T>> removeUselessClassifiers(List<PartialClassifier<T>> partialClassifiers) {
         int lastFullClassifier = -1;
         int n = partialClassifiers.size();
         for (int i = n-1; i >= 0; i--) {

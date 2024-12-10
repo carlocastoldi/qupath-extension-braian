@@ -63,12 +63,12 @@ public class ChannelClassifierConfig {
      * @throws IOException if any problem raises when reading the JSON file, supposedly corresponding to a QuPath
      * object classifier.
      */
-    public ObjectClassifier loadClassifier() throws IOException {
+    public <T> ObjectClassifier<T> loadClassifier() throws IOException {
         if (this.getName().equalsIgnoreCase("all"))
-            return new SingleClassifier(ChannelDetections.createClassification(this.channel));
+            return new SingleClassifier<>(ChannelDetections.createClassification(this.channel));
         Path classifierPath = BraiAn.resolvePath(this.getName()+".json");
         // inspired by QP.loadObjectClassifier()
-        ObjectClassifier classifier = null;
+        ObjectClassifier<T> classifier = null;
         Exception exception = null;
 
         try {
@@ -107,8 +107,8 @@ public class ChannelClassifierConfig {
      * @see ChannelClassifierConfig#loadClassifier()
      * @see ChannelClassifierConfig#getAnnotationsToClassify()
      */
-    public PartialClassifier toPartialClassifier(PathObjectHierarchy hierarchy) throws IOException {
-        ObjectClassifier classifier = this.loadClassifier();
-        return new PartialClassifier(classifier, this.getAnnotationsToClassify(hierarchy));
+    public <T> PartialClassifier<T> toPartialClassifier(PathObjectHierarchy hierarchy) throws IOException {
+        ObjectClassifier<T> classifier = this.loadClassifier();
+        return new PartialClassifier<>(classifier, this.getAnnotationsToClassify(hierarchy));
     }
 }

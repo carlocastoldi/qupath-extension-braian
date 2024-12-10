@@ -18,7 +18,7 @@ import java.util.List;
  *                    If <code>null</code>, it applies it to the whole image.
  * @see AbstractDetections#applyClassifiers(List, ImageData)
  */
-public record PartialClassifier(ObjectClassifier<?> classifier, Collection<PathAnnotationObject> annotations) {
+public record PartialClassifier<T>(ObjectClassifier<T> classifier, Collection<PathAnnotationObject> annotations) {
     /**
      * @return true, if the partial classifier covers the whole whole image, thus causing all detections to be classified
      */
