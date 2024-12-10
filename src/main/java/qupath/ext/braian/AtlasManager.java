@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static qupath.ext.braian.BraiAnExtension.getLogger;
-import static qupath.ext.braian.BraiAnExtension.logger;
 
 class ImportedAtlasNotFound extends RuntimeException {
     public ImportedAtlasNotFound() {
@@ -35,7 +34,7 @@ class ImportedAtlasNotFound extends RuntimeException {
 }
 
 /**
- * This class helps managing and exporting results for each brain region. It works closely with ABBA's QuPath extension.
+ * This class helps to manage and exporting results for each brain region. It works closely with ABBA's QuPath extension.
  */
 public class AtlasManager {
     public final static String um = GeneralTools.micrometerSymbol();
@@ -98,7 +97,7 @@ public class AtlasManager {
         List<PathObject> atlases = AtlasManager.search(hierarchy);
         if (atlases.isEmpty())
             throw new ImportedAtlasNotFound();
-        this.atlasObject = atlases.get(0);
+        this.atlasObject = atlases.getFirst();
         if (atlases.size()>1)
             getLogger().warn("Several imported atlases have been found. Selecting: {}", this.atlasObject);
     }
@@ -156,6 +155,7 @@ public class AtlasManager {
 
         ProjectImageEntry<BufferedImage> entry = QP.getProjectEntry();
 
+        assert entry != null;
         String rawImageName = entry.getImageName();
         double numericValue;
 
@@ -165,10 +165,10 @@ public class AtlasManager {
             results.addValue("Image Name", rawImageName);
 
             // Check if image has associated metadata and add it as columns
-            if (!entry.getMetadataKeys().isEmpty()) {
-                Collection<String> keys = entry.getMetadataKeys();
-                for (String key : keys) {
-                    results.addValue("Metadata_" + key, entry.getMetadataValue(key));
+            if (!entry.getMetadata().isEmpty()) {
+                Map<String, String> metadata = entry.getMetadata();
+                for(String key: metadata.keySet()) {
+                    results.addValue("Metadata_" + key, metadata.get(key));
                 }
             }
 
