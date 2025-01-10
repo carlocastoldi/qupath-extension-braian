@@ -30,6 +30,7 @@ dependencies {
     // For testing
     testImplementation(libs.bundles.qupath)
     testImplementation(libs.junit)
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core:5.+")
 }
 
@@ -59,11 +60,8 @@ tasks.jacocoTestCoverageVerification {
 }
 
 fun printJacocoCoverage(xpath: String): String {
-    val jacocoCoverage = ByteArrayOutputStream()
-    exec {
-        commandLine("xmllint","-html","-xpath", "//tfoot//td["+xpath+"]/text()", "build/reports/jacoco/test/html/index.html")
-        standardOutput = jacocoCoverage
-        isIgnoreExitValue = true
-    }
-    return  jacocoCoverage.toString()
+    val jacocoCoverage = providers.exec {
+        commandLine("xmllint","-html","-xpath", "//tfoot//td[$xpath]/text()", "build/reports/jacoco/test/html/index.html")
+    }.standardOutput.asText.get()
+    return  jacocoCoverage
 }
