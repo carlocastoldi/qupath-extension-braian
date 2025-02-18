@@ -4,6 +4,7 @@
 
 package qupath.ext.braian;
 
+import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 
 import java.util.*;
@@ -13,20 +14,61 @@ import java.util.stream.IntStream;
 import static qupath.ext.braian.BraiAnExtension.logger;
 
 public class ChannelHistogram {
+    private static int retrieveBitDepth(ImageStatistics stats) {
+        if(stats.histogram16 != null)
+            return 16;
+        else
+            return 8;
+    }
+
+    private static long[] getLongHistogram(ImageStatistics stats) {
+        if(stats.histogram16 != null)
+            return Arrays.stream(stats.histogram16).asLongStream().toArray();
+        else
+            return stats.getHistogram();
+    }
+
     private final String channelName;
+    private final int bitDepth;
     private final long[] values;
+
+    private ChannelHistogram(String channelName, int bitDepth, long[] histogram) {
+        this.channelName = channelName;
+        this.bitDepth = bitDepth;
+        if(bitDepth == 16)
+            this.values = new long[65536];
+        else
+            this.values = new long[256];
+        // this way, if histogram is shorter than bitDepth, it fills the rest of the values with zeros.
+        // see https://forum.image.sc/t/braian-qupath-scripting-error/108774
+        System.arraycopy(histogram, 0, this.values, 0, histogram.length);
+    }
+
+    /**
+     * Constructs the channel histogram from an ImageJ image.
+     * @param channelName the name of the QuPath channel associated to this histogram
+     * @param image the processor used by ImageJ to represent a given image channel
+     */
+    public ChannelHistogram(String channelName, ImageProcessor image) {
+        this(channelName, image.getBitDepth(), getLongHistogram(image.getStats()));
+    }
 
     /**
      * Constructs the channel histogram from the {@link ImageStatistics} object
      * @param channelName the name of the QuPath channel associated to this histogram
      * @param stats the statistics representing a given image channel
+     * @see ChannelHistogram(String, ImageProcessor)
      */
+    @Deprecated(since = "1.0.4")
     public ChannelHistogram(String channelName, ImageStatistics stats) {
-        this.channelName = channelName;
-        if(stats.histogram16 != null)
-            this.values = Arrays.stream(stats.histogram16).asLongStream().toArray();
-        else
-            this.values = stats.getHistogram();
+        this(channelName, retrieveBitDepth(stats), getLongHistogram(stats));
+    }
+
+    /**
+     * @return the bit depth of the image on which the histogram was computed
+     */
+    public int getBitDepth() {
+        return this.bitDepth;
     }
 
     /**
@@ -40,14 +82,14 @@ public class ChannelHistogram {
      * @return true if the current histogram is built from a 8-bit image
      */
     public boolean is8bit() {
-        return this.values.length == 256;
+        return this.bitDepth == 8;
     }
 
     /**
      * @return true if the current histogram is built from a 16-bit image
      */
     public boolean is16bit() {
-        return this.values.length == 65536;
+        return this.bitDepth == 16;
     }
 
     public int getMaxValue() {

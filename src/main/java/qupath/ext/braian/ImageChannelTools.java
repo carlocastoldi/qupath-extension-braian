@@ -67,19 +67,19 @@ public class ImageChannelTools {
      * @see ImageServer#getDownsampleForResolution(int)
      */
     public ChannelHistogram getHistogram(int resolutionLevel) throws IOException {
-        return new ChannelHistogram(this.name, this.getChannelStats(resolutionLevel));
+        return new ChannelHistogram(this.name, this.getImageProcessor(resolutionLevel));
     }
 
     /**
-     * Computes the {@link ImageStatistics} of the current channel at the given resolution.
+     * Retrieves the corresponding {@link ImageProcessor} of the current channel at the given resolution.
      * @param resolutionLevel Resolution level, If it's bigger than {@link ImageServer#nResolutions()}-1,
      *                        than it uses the given n-th resolution.
-     * @return the statistics of the channel computed by ImageJ at the given resolution
+     * @return the image channel as processed by ImageJ at the given resolution
      * @throws IOException when it fails to read the image file
      * @see #getChannelStats(int)
      * @see ImageServer#getDownsampleForResolution(int)
      */
-    public ImageStatistics getChannelStats(int resolutionLevel) throws IOException {
+    public ImageProcessor getImageProcessor(int resolutionLevel) throws IOException {
         double downsample = this.server.getDownsampleForResolution(Math.min(this.server.nResolutions()-1, resolutionLevel));
         RegionRequest request = RegionRequest.createInstance(this.server, downsample);
         PathImage<ImagePlus> pathImage = IJTools.convertToImagePlus(this.server, request);
@@ -90,7 +90,22 @@ public class ImageChannelTools {
         ImageProcessor ip = ci.getChannelProcessor();
         ip = ip.duplicate();
         ip.resetRoi();
-        return ip.getStats();
+        return ip;
+    }
+
+    /**
+     * Computes the {@link ImageStatistics} of the current channel at the given resolution.
+     * @param resolutionLevel Resolution level, If it's bigger than {@link ImageServer#nResolutions()}-1,
+     *                        than it uses the given n-th resolution.
+     * @return the statistics of the channel computed by ImageJ at the given resolution
+     * @throws IOException when it fails to read the image file
+     * @see #getChannelStats(int)
+     * @see #getImageProcessor(int)
+     * @see ImageServer#getDownsampleForResolution(int)
+     */
+    @Deprecated(since = "1.0.4")
+    public ImageStatistics getChannelStats(int resolutionLevel) throws IOException {
+        return this.getImageProcessor(resolutionLevel).getStats();
     }
 
     /**
