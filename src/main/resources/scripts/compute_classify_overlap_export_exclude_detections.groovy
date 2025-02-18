@@ -75,14 +75,16 @@ if ((control = config.getControlChannel()).isPresent() ) {
 }
 
 // EXPORT RESULTS
-if (AtlasManager.isImported(hierarchy)) {
-    var atlas = new AtlasManager(hierarchy)
+var atlasName = "allen_mouse_10um_java"
+if (AtlasManager.isImported(atlasName, hierarchy)) {
+    var atlas = new AtlasManager(atlasName, hierarchy)
     var imageName = getProjectEntry().getImageName().replace("/", "-")
 
     var resultsFile = new File(buildPathInProject("results", imageName + "_regions.tsv")) // can be .csv too
     atlas.saveResults(allDetections + overlaps, resultsFile)
 
     def exclusionsFile = new File(buildPathInProject("regions_to_exclude", imageName + "_regions_to_exclude.txt"))
+    atlas.fixExclusions() // just in case
     atlas.saveExcludedRegions(exclusionsFile)
 }
 
