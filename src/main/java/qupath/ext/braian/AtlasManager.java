@@ -57,18 +57,31 @@ public class AtlasManager {
     public final static PathClass ABBA_RIGHT = PathClass.fromString("Right");
 
     /**
-     * Checks whether an ABBA atlas was previously imported.
+     * Checks whether at least one ABBA atlas was previously imported.
      * @param hierarchy where to search for the atlas
      * @return true if an ABBA atlas was previously imported
      */
     public static boolean isImported(PathObjectHierarchy hierarchy) {
-        return !AtlasManager.search(hierarchy).isEmpty();
+        return !AtlasManager.search(null, hierarchy).isEmpty();
     }
 
-    private static List<PathObject> search(PathObjectHierarchy hierarchy) {
+    /**
+     * Checks whether a specific ABBA atlas was previously imported.
+     * @param atlasName the name of the atlas to check.
+     *                  If null, it checks whether <i>any</i> atlas was imported with ABBA
+     * @param hierarchy where to search for the atlas
+     * @return true if the atlas was previously imported
+     */
+    public static boolean isImported(String atlasName, PathObjectHierarchy hierarchy) {
+        return !AtlasManager.search(atlasName, hierarchy).isEmpty();
+    }
+
+    private static List<PathObject> search(String atlasName, PathObjectHierarchy hierarchy) {
         return hierarchy.getAnnotationObjects()
                 .stream()
-                .filter(o -> "Root".equals(o.getName())) //&& o.getPathClass() != null && o.getPathClass().equals(atlasClass))
+                .filter(o -> "Root".equals(o.getName()) &&
+                            (atlasName == null || (o.getPathClass() != null && o.getPathClass().getName().equals(atlasName)))
+                        )
                 .toList();
     }
 
@@ -106,12 +119,16 @@ public class AtlasManager {
     private final PathObjectHierarchy hierarchy;
 
     /**
+     * Constructs a manager of the specified atlas imported with ABBA.
+     * @param atlasName the name of the atlas that was imported with ABBA.
+     *                  If null, it selects the first available.
      * @param hierarchy where to search for the atlas
-     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @throws ImportedAtlasNotFound if the specified atlas was not found
+     * @throws DisruptedAtlasHierarchy if the found atlas hierarchy was disrupted
      */
-    public AtlasManager(PathObjectHierarchy hierarchy) {
+    public AtlasManager(String atlasName, PathObjectHierarchy hierarchy) {
         this.hierarchy = hierarchy;
-        List<PathObject> atlases = AtlasManager.search(hierarchy);
+        List<PathObject> atlases = AtlasManager.search(atlasName, hierarchy);
         if (atlases.isEmpty())
             throw new ImportedAtlasNotFound();
         this.atlasObject = atlases.get(0);
@@ -119,6 +136,24 @@ public class AtlasManager {
             throw new DisruptedAtlasHierarchy(this.atlasObject);
         if (atlases.size()>1)
             getLogger().warn("Several imported atlases have been found. Selecting: {}", this.atlasObject);
+    }
+
+    /**
+     * Constructs a manager of the first available atlas imported with ABBA.
+     * @param hierarchy where to search for an atlas
+     * @throws ImportedAtlasNotFound if no atlas was not found in the object hierarchy
+     * @throws DisruptedAtlasHierarchy if the found atlas hierarchy was disrupted
+     * @see AtlasManager(String, PathObjectHierarchy)
+     */
+    public AtlasManager(PathObjectHierarchy hierarchy) {
+        this(null, hierarchy);
+    }
+
+    /**
+     * @return the annotations that contains all atlas annotations.
+     */
+    public PathObject getRoot() {
+        return this.atlasObject;
     }
 
     /**
