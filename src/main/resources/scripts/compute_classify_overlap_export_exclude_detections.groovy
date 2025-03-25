@@ -45,13 +45,13 @@ var allDetections = config.channelDetections.collect { detectionsConf ->
     }
 }.findAll { it != null }
 
+// RETRIEVE PRE-COMPUTED CHANNEL DETECTIONS
+// var allDetections = config.channelDetections.collect { detectionsConf -> new ChannelDetections(detectionsConf.name, hierarchy) }
+
 if (allDetections.isEmpty()) {
     println getCurrentImageName()+" : DONE! No annotations found to compute on"
     return
 }
-
-// RETRIEVE PRE-COMPUTED CHANNEL DETECTIONS
-// var allDetections = config.channelDetections.collect { detectionsConf -> new ChannelDetections(detectionsConf.name, hierarchy) }
 
 // CLASSIFY CHANNEL DETECTIONS
 allDetections.forEach { detections ->
@@ -78,7 +78,11 @@ if ((control = config.getControlChannel()).isPresent() ) {
 var atlasName = "allen_mouse_10um_java"
 if (AtlasManager.isImported(atlasName, hierarchy)) {
     var atlas = new AtlasManager(atlasName, hierarchy)
-    var imageName = getProjectEntry().getImageName().replace("/", "-")
+
+    INVALID_CHARS_WIN = ['<', '>' ,':', '"', '/', '\\', '|', '?', '*'] as Set<Character>
+    INVALID_CHARS_NIX = ['/'] as Set<Character>
+    def invalid_chars_regex = (INVALID_CHARS_WIN+INVALID_CHARS_NIX).collect { java.util.regex.Pattern.quote(it) }.join('|')
+    def imageName = getProjectEntry().getImageName().replaceAll(invalid_chars_regex, '')
 
     var resultsFile = new File(buildPathInProject("results", imageName + "_regions.tsv")) // can be .csv too
     atlas.saveResults(allDetections + overlaps, resultsFile)
