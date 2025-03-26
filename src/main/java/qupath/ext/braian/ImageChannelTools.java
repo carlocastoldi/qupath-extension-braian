@@ -63,8 +63,6 @@ public class ImageChannelTools {
     }
 
     private ImageServerMetadata getMetadata() {
-        if (this.server != null)
-            return this.server.getMetadata();
         return this.imageData.getServerMetadata();
     }
 
