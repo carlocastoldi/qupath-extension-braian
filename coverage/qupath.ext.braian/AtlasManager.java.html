@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AtlasManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian</a> &gt; <span class="el_source">AtlasManager.java</span></div><h1>AtlasManager.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian;
+
+import qupath.ext.braian.utils.BraiAn;
+import qupath.lib.common.GeneralTools;
+import qupath.lib.gui.measure.ObservableMeasurementTableData;
+import qupath.lib.objects.PathAnnotationObject;
+import qupath.lib.objects.PathObject;
+import qupath.lib.objects.PathObjectTools;
+import qupath.lib.objects.classes.PathClass;
+import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+import qupath.lib.projects.ProjectImageEntry;
+import qupath.lib.scripting.QP;
+
+import ij.measure.ResultsTable;
+import java.awt.image.BufferedImage;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static qupath.ext.braian.BraiAnExtension.getLogger;
+
+class ImportedAtlasNotFound extends RuntimeException {
+    public ImportedAtlasNotFound() {
+<span class="nc" id="L32">        super(&quot;No previously imported atlas found. Use ABBA to align the slice to an atlas and import the brain annotations in the QuPath project &quot;);</span>
+<span class="nc" id="L33">    }</span>
+}
+
+class DisruptedAtlasHierarchy extends RuntimeException {
+    public DisruptedAtlasHierarchy(PathObject atlas) {
+<span class="nc" id="L38">        super(&quot;The atlas hierarchy '&quot;+atlas+&quot;' was disrupted. &quot;+</span>
+                &quot;You must import the atlas annotations again and delete any previous region annotation.&quot;);
+<span class="nc" id="L40">    }</span>
+}
+
+class ExclusionMistakeException extends RuntimeException {
+    public ExclusionMistakeException() {
+<span class="nc" id="L45">        super(&quot;Some regions in the atlas ontology were wrongly classified as '&quot;+AtlasManager.EXCLUDE_CLASSIFICATION+&quot;'.\n&quot;+</span>
+                &quot;You can try to fix this by calling fixExclusions() on the AtlasManager instance.&quot;);
+<span class="nc" id="L47">    }</span>
+}
+
+/**
+ * This class helps managing and exporting results for each brain region. It works closely with ABBA's QuPath extension.
+ */
+public class AtlasManager {
+<span class="nc" id="L54">    public final static String um = GeneralTools.micrometerSymbol();</span>
+<span class="nc" id="L55">    public final static PathClass EXCLUDE_CLASSIFICATION = PathClass.fromString(&quot;Exclude&quot;);</span>
+<span class="nc" id="L56">    public final static PathClass ABBA_LEFT = PathClass.fromString(&quot;Left&quot;);</span>
+<span class="nc" id="L57">    public final static PathClass ABBA_RIGHT = PathClass.fromString(&quot;Right&quot;);</span>
+
+    /**
+     * Checks whether at least one ABBA atlas was previously imported.
+     * @param hierarchy where to search for the atlas
+     * @return true if an ABBA atlas was previously imported
+     */
+    public static boolean isImported(PathObjectHierarchy hierarchy) {
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        return !AtlasManager.search(null, hierarchy).isEmpty();</span>
+    }
+
+    /**
+     * Checks whether a specific ABBA atlas was previously imported.
+     * @param atlasName the name of the atlas to check.
+     *                  If null, it checks whether &lt;i&gt;any&lt;/i&gt; atlas was imported with ABBA
+     * @param hierarchy where to search for the atlas
+     * @return true if the atlas was previously imported
+     */
+    public static boolean isImported(String atlasName, PathObjectHierarchy hierarchy) {
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        return !AtlasManager.search(atlasName, hierarchy).isEmpty();</span>
+    }
+
+    private static List&lt;PathObject&gt; search(String atlasName, PathObjectHierarchy hierarchy) {
+<span class="nc" id="L80">        return hierarchy.getAnnotationObjects()</span>
+<span class="nc" id="L81">                .stream()</span>
+<span class="nc bnc" id="L82" title="All 4 branches missed.">                .filter(o -&gt; &quot;Root&quot;.equals(o.getName()) &amp;&amp;</span>
+<span class="nc bnc" id="L83" title="All 4 branches missed.">                            (atlasName == null || (o.getPathClass() != null &amp;&amp; o.getPathClass().getName().equals(atlasName)))</span>
+                        )
+<span class="nc" id="L85">                .toList();</span>
+    }
+
+    private static Stream&lt;PathObject&gt; flattenObjectStream(PathObject parent) {
+<span class="nc" id="L89">        return Stream.concat(</span>
+<span class="nc" id="L90">                Stream.of(parent),</span>
+<span class="nc" id="L91">                parent.getChildObjects().stream()</span>
+<span class="nc" id="L92">                        .filter(o -&gt; o instanceof PathAnnotationObject)</span>
+<span class="nc" id="L93">                        .flatMap(AtlasManager::flattenObjectStream)</span>
+        );
+    }
+
+    private static List&lt;PathObject&gt; flattenObject(PathObject parent) {
+<span class="nc" id="L98">        return flattenObjectStream(parent).toList();</span>
+    }
+
+    private static List&lt;String&gt; getDetectionsMeasurements(List&lt;AbstractDetections&gt; detections) {
+        // TODO: should avoid resorting to QP to get the server metadata
+<span class="nc" id="L103">        var cal = QP.getCurrentServer().getMetadata().getPixelCalibration();</span>
+<span class="nc bnc" id="L104" title="All 4 branches missed.">        if (!um.equals(cal.getPixelWidthUnit()) || !um.equals(cal.getPixelHeightUnit()))</span>
+<span class="nc" id="L105">            throw new RuntimeException(&quot;FAILED to export results. Expected image pixel units to be in 'µm', instead got them in '&quot;+</span>
+<span class="nc" id="L106">                    cal.getPixelWidthUnit()+&quot;' and '&quot;+cal.getPixelWidthUnit()+&quot;'. Try setting it with setPixelSizeMicrons()&quot;);</span>
+<span class="nc" id="L107">        Stream&lt;String&gt; genericMeasurements = Stream.of(&quot;Name&quot;, &quot;Classification&quot;, &quot;Area &quot;+um+&quot;^2&quot;, &quot;Num Detections&quot;);</span>
+<span class="nc" id="L108">        Stream&lt;String&gt; detectionsMeasurements = detections.stream().flatMap(d -&gt; d.getDetectionsPathClasses().stream().map(pc -&gt; &quot;Num &quot;+pc.getName()));</span>
+<span class="nc" id="L109">        return Stream.concat(genericMeasurements, detectionsMeasurements).toList();</span>
+    }
+
+    private static List&lt;PathObject&gt; getExclusionAnnotations(PathObjectHierarchy hierarchy) {
+<span class="nc" id="L113">        return hierarchy.getAnnotationObjects().stream()</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                .filter( ann -&gt; ann.getPathClass() == AtlasManager.EXCLUDE_CLASSIFICATION )</span>
+<span class="nc" id="L115">                .toList();</span>
+    }
+
+    private final PathObject atlasObject;
+    private final PathObjectHierarchy hierarchy;
+
+    /**
+     * Constructs a manager of the specified atlas imported with ABBA.
+     * @param atlasName the name of the atlas that was imported with ABBA.
+     *                  If null, it selects the first available.
+     * @param hierarchy where to search for the atlas
+     * @throws ImportedAtlasNotFound if the specified atlas was not found
+     * @throws DisruptedAtlasHierarchy if the found atlas hierarchy was disrupted
+     */
+<span class="nc" id="L129">    public AtlasManager(String atlasName, PathObjectHierarchy hierarchy) {</span>
+<span class="nc" id="L130">        this.hierarchy = hierarchy;</span>
+<span class="nc" id="L131">        List&lt;PathObject&gt; atlases = AtlasManager.search(atlasName, hierarchy);</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (atlases.isEmpty())</span>
+<span class="nc" id="L133">            throw new ImportedAtlasNotFound();</span>
+<span class="nc" id="L134">        this.atlasObject = atlases.get(0);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (this.atlasObject.getChildObjects().isEmpty())</span>
+<span class="nc" id="L136">            throw new DisruptedAtlasHierarchy(this.atlasObject);</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (atlases.size()&gt;1)</span>
+<span class="nc" id="L138">            getLogger().warn(&quot;Several imported atlases have been found. Selecting: {}&quot;, this.atlasObject);</span>
+<span class="nc" id="L139">    }</span>
+
+    /**
+     * Constructs a manager of the first available atlas imported with ABBA.
+     * @param hierarchy where to search for an atlas
+     * @throws ImportedAtlasNotFound if no atlas was not found in the object hierarchy
+     * @throws DisruptedAtlasHierarchy if the found atlas hierarchy was disrupted
+     * @see AtlasManager(String, PathObjectHierarchy)
+     */
+    public AtlasManager(PathObjectHierarchy hierarchy) {
+<span class="nc" id="L149">        this(null, hierarchy);</span>
+<span class="nc" id="L150">    }</span>
+
+    /**
+     * @return the annotations that contains all atlas annotations.
+     */
+    public PathObject getRoot() {
+<span class="nc" id="L156">        return this.atlasObject;</span>
+    }
+
+    /**
+     * Flattens the atlas's ontology into a list of annotations.
+     * It may return some non-region annotations too, if the atlas hierarchy was modified with added/removed elements.
+     * @return the list of all brain regions in the atlas
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @see #flatten(List)
+     */
+    public List&lt;PathObject&gt; flatten() {
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (this.atlasObject.getChildObjects().isEmpty())</span>
+<span class="nc" id="L168">            throw new DisruptedAtlasHierarchy(this.atlasObject);</span>
+<span class="nc" id="L169">        return AtlasManager.flattenObject(this.atlasObject);</span>
+    }
+
+    /**
+     * Flattens the atlas ontology into a list of annotations.
+     * If the atlas hierarchy was modified by adding {@link AbstractDetections}'s containers,
+     * it filters them from the current brain hierarchy.
+     * &lt;br&gt;
+     * It may still return some non-region annotations, if the atlas hierarchy was further modified with added/removed elements.
+     * @return the list of all brain regions in the atlas
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @see #flatten()
+     */
+    public List&lt;PathObject&gt; flatten(List&lt;AbstractDetections&gt; detections) {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (this.atlasObject.getChildObjects().isEmpty())</span>
+<span class="nc" id="L184">            throw new DisruptedAtlasHierarchy(this.atlasObject);</span>
+<span class="nc" id="L185">        List&lt;PathAnnotationObject&gt; containers = detections.stream().flatMap(d -&gt; d.getContainers().stream()).toList();</span>
+<span class="nc" id="L186">        List&lt;PathObject&gt; brainRegions = AtlasManager.flattenObjectStream(this.atlasObject)</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">                .filter(ann -&gt; !containers.contains(ann))</span>
+<span class="nc" id="L188">                .toList();</span>
+<span class="nc" id="L189">        return brainRegions;</span>
+    }
+
+    /**
+     * Saves a TSV file containing data for each brain region of the atlas.
+     * Namely, Image name, brain region name, hemisphere, area in µm², number of detections for each of the given types.
+     * The table is saved as a CSV (comma-separated values) file if 'file' ends with &quot;.csv&quot;
+     * @param detections the list of detection of which to gather the data for each region
+     * @param file the file where it should write to. Note that if the file exists, it will be overwritten
+     * @throws ExclusionMistakeException if the atlas hierarchy contains regions classified as {@link #EXCLUDE_CLASSIFICATION}.
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     */
+    // Olivier Burri &lt;https://github.com/lacan&gt; wrote mostly of this function and published under Apache-2.0 license for qupath-extension-biop
+    public boolean saveResults(List&lt;AbstractDetections&gt; detections, File file) {
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (this.atlasObject.getChildObjects().isEmpty())</span>
+<span class="nc" id="L204">            throw new DisruptedAtlasHierarchy(this.atlasObject);</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (file.exists())</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if(!file.delete()) {</span>
+<span class="nc" id="L207">                getLogger().error(&quot;Could not delete previous results file {}, the file could be locked.&quot;, file.getName());</span>
+<span class="nc" id="L208">                return false;</span>
+            }
+<span class="nc" id="L210">        QP.mkdirs(file.getAbsoluteFile().getParent());</span>
+
+        // We use a ResultsTable to store the data
+<span class="nc" id="L213">        ResultsTable results = new ResultsTable();</span>
+
+<span class="nc" id="L215">        ObservableMeasurementTableData ob = new ObservableMeasurementTableData();</span>
+<span class="nc" id="L216">        List&lt;PathObject&gt; brainRegions = this.flatten(detections);</span>
+<span class="nc bnc" id="L217" title="All 4 branches missed.">        if (brainRegions.stream().anyMatch(p -&gt; p.getPathClass() == EXCLUDE_CLASSIFICATION))</span>
+<span class="nc" id="L218">            throw new ExclusionMistakeException();</span>
+        // This line creates all the measurements
+<span class="nc" id="L220">        ob.setImageData(QP.getCurrentImageData(), brainRegions);</span>
+
+<span class="nc" id="L222">        ProjectImageEntry&lt;BufferedImage&gt; entry = QP.getProjectEntry();</span>
+
+<span class="nc" id="L224">        String rawImageName = entry.getImageName();</span>
+        double numericValue;
+
+        // Add value for each selected object
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        for (PathObject brainRegion : brainRegions) {</span>
+<span class="nc" id="L229">            results.incrementCounter();</span>
+<span class="nc" id="L230">            results.addValue(&quot;Image Name&quot;, rawImageName);</span>
+
+            // Check if image has associated metadata and add it as columns
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (!entry.getMetadataKeys().isEmpty()) {</span>
+<span class="nc" id="L234">                Collection&lt;String&gt; keys = entry.getMetadataKeys();</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                for (String key : keys) {</span>
+<span class="nc" id="L236">                    results.addValue(&quot;Metadata_&quot; + key, entry.getMetadataValue(key));</span>
+<span class="nc" id="L237">                }</span>
+            }
+
+            // Then we can add the results the user requested
+            // Because the Mu is sometimes poorly formatted, we remove them in favor of a 'u'
+<span class="nc bnc" id="L242" title="All 2 branches missed.">            for (String col : AtlasManager.getDetectionsMeasurements(detections)) {</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">                if (ob.isNumericMeasurement(col)) {</span>
+<span class="nc" id="L244">                    numericValue = ob.getNumericValue(brainRegion, col);</span>
+<span class="nc bnc" id="L245" title="All 4 branches missed.">                    if (col.startsWith(&quot;Num &quot;) &amp;&amp; Double.isNaN(numericValue))</span>
+<span class="nc" id="L246">                        numericValue = 0.;</span>
+<span class="nc" id="L247">                    results.addValue(col.replace(um, &quot;um&quot;), numericValue);</span>
+                }
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                if (ob.isStringMeasurement(col))</span>
+<span class="nc" id="L250">                    results.addValue(col.replace(um, &quot;um&quot;), ob.getStringValue(brainRegion, col));</span>
+<span class="nc" id="L251">            }</span>
+<span class="nc" id="L252">        }</span>
+<span class="nc" id="L253">        boolean isSaved = results.save(file.getAbsolutePath());</span>
+<span class="nc" id="L254">        getLogger().info(&quot;Results '{}' Saved under '{}', contains {} rows&quot;, file.getName(), file.getParentFile().getAbsolutePath(), results.size());</span>
+<span class="nc" id="L255">        return isSaved;</span>
+    }
+
+    /**
+     * Gets all the brain regions that should be excluded from further analysis due to being missing or badly aligned to the image.
+     * A brain region, in order to be excluded, must:
+     * &lt;ul&gt;
+     *   &lt;li&gt;either be contained into a larger annotation, classified as &quot;Exclude&quot;
+     * 	 &lt;li&gt;or be &lt;b&gt;duplicated&lt;/b&gt; (SHIFT+D) outside the Atlas's hierarchy, and then classified as &quot;Exclude&quot;
+     * &lt;/ul&gt;
+     * @return a set of brain regions' annotations that should be excluded.
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     */
+    public Set&lt;PathObject&gt; getExcludedBrainRegions() {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (this.atlasObject.getChildObjects().isEmpty())</span>
+<span class="nc" id="L270">            throw new DisruptedAtlasHierarchy(this.atlasObject);</span>
+<span class="nc" id="L271">        List&lt;PathObject&gt; excludeAnnotations = AtlasManager.getExclusionAnnotations(this.hierarchy);</span>
+<span class="nc" id="L272">        getLogger().info(&quot;Exclusion annotations: [{}]&quot;, BraiAn.join(excludeAnnotations, &quot;, &quot;));</span>
+        // We export all the annotations that are not &quot;Exclude&quot; or named &quot;Root&quot;.
+        // This serves as a downstream ~check~ that the slice has nothing else other than the atlas annotations and the exclusions
+<span class="nc" id="L275">        var otherAnnotations = this.hierarchy.getAnnotationObjects().stream()</span>
+<span class="nc bnc" id="L276" title="All 4 branches missed.">                .filter( ann -&gt; ann.getPathClass() != AtlasManager.EXCLUDE_CLASSIFICATION &amp;&amp; ann != this.atlasObject)</span>
+<span class="nc" id="L277">                .toList();</span>
+        // Loop over exclusions that contain the annotations to be removed/excluded
+<span class="nc" id="L279">        Set&lt;PathObject&gt; regionsToExcludeFlattened = excludeAnnotations.stream()</span>
+<span class="nc" id="L280">                .map(exclusion -&gt; exclusion.getROI().getGeometry())</span>
+<span class="nc" id="L281">                .flatMap(exclusion -&gt; otherAnnotations.stream().filter(ann -&gt; ann.getROI().getGeometry().coveredBy(exclusion)))</span>
+<span class="nc" id="L282">                .collect(Collectors.toSet());</span>
+        // remove 'child' annotations that are descendant of an excluded parent
+<span class="nc" id="L284">        var regionsToExclude = new HashSet&lt;&gt;(regionsToExcludeFlattened);</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        for (PathObject r1: regionsToExcludeFlattened) {</span>
+<span class="nc" id="L286">            List&lt;PathObject&gt; descendants = AtlasManager.flattenObject(r1);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            for (PathObject r2: regionsToExcludeFlattened)</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">                if (descendants.indexOf(r2) &gt; 0) // in 0 there is r1 itself, the parent annotation</span>
+<span class="nc" id="L289">                    regionsToExclude.remove(r2);</span>
+<span class="nc" id="L290">        }</span>
+<span class="nc" id="L291">        return regionsToExclude;</span>
+    }
+
+    /**
+     * Saves a file containing, on each line, the name and hemisphere of the regions to be excluded.
+     * @param file the file where it should write to. Note that if the file exists, it will be overwritten
+     * @return true if the file was correctly saved.
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @see #getExcludedBrainRegions()
+     * @see #saveResults(List, File)
+     */
+    public boolean saveExcludedRegions(File file) {
+<span class="nc bnc" id="L303" title="All 2 branches missed.">        if (this.atlasObject.getChildObjects().isEmpty())</span>
+<span class="nc" id="L304">            throw new DisruptedAtlasHierarchy(this.atlasObject);</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        if (file.exists())</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            if(!file.delete()) {</span>
+<span class="nc" id="L307">                getLogger().error(&quot;Could not delete previous exclusion file {}, the file could be locked.&quot;, file.getName());</span>
+<span class="nc" id="L308">                return false;</span>
+            }
+<span class="nc" id="L310">        QP.mkdirs(file.getAbsoluteFile().getParent());</span>
+
+<span class="nc" id="L312">        Set&lt;PathObject&gt; regionsToExcludeSet = this.getExcludedBrainRegions();</span>
+<span class="nc" id="L313">        List&lt;PathObject&gt; regionsToExclude = regionsToExcludeSet.stream()</span>
+<span class="nc" id="L314">                .sorted(Comparator.comparing(o -&gt; o.getPathClass().toString()))</span>
+<span class="nc" id="L315">                .toList();</span>
+<span class="nc" id="L316">        getLogger().info(&quot;Excluded regions: [{}]&quot;, BraiAn.join(regionsToExclude, &quot;, &quot;));</span>
+
+<span class="nc" id="L318">        QP.resetSelection();</span>
+<span class="nc" id="L319">        QP.selectObjects(regionsToExclude);</span>
+
+<span class="nc" id="L321">        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            for (PathObject region : regionsToExclude) {</span>
+<span class="nc" id="L323">                writer.write(region.getPathClass().toString());</span>
+<span class="nc" id="L324">                writer.newLine();</span>
+<span class="nc" id="L325">            }</span>
+<span class="nc" id="L326">        } catch (IOException e) {</span>
+<span class="nc" id="L327">            getLogger().error(&quot;Error saving excluded regions: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L328">            return false;</span>
+<span class="nc" id="L329">        }</span>
+<span class="nc" id="L330">        getLogger().info(&quot;Exclusions '{}' Saved under '{}', contains {} rows&quot;, file.getName(), file.getParentFile().getAbsolutePath(), regionsToExclude.size());</span>
+<span class="nc" id="L331">        return true;</span>
+    }
+
+    /**
+     * Return whether the current atlas is split between left and right hemispheres.
+     * Atlas hierarchies that were modified by deleting one of the two hemispheres, are still recognised as split.
+     * @return true if the current atlas is split between left and right hemispheres.
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * whether the atlas was split between left and right.
+     */
+    public boolean isSplit() {
+<span class="nc bnc" id="L342" title="All 2 branches missed.">        if (this.atlasObject.getChildObjects().isEmpty())</span>
+<span class="nc" id="L343">            throw new DisruptedAtlasHierarchy(this.atlasObject);</span>
+<span class="nc" id="L344">        List&lt;PathObject&gt; roots = this.atlasObject.getChildObjects().stream()</span>
+<span class="nc" id="L345">                .filter(ann -&gt; &quot;root&quot;.equals(ann.getName()))</span>
+<span class="nc" id="L346">                .toList();</span>
+<span class="nc" id="L347">        return roots.stream()</span>
+                // anyMatch because if there are multiple &quot;root&quot; annotations, an
+<span class="nc" id="L349">                .anyMatch(root -&gt; {</span>
+<span class="nc" id="L350">                            Set&lt;PathClass&gt; hemispheres = flattenObject(root).stream()</span>
+<span class="nc" id="L351">                                    .map(PathObject::getPathClass)</span>
+<span class="nc bnc" id="L352" title="All 4 branches missed.">                                    .filter(c -&gt; c.isDerivedFrom(ABBA_LEFT) || c.isDerivedFrom(ABBA_RIGHT))</span>
+<span class="nc" id="L353">                                    .map(PathClass::getParentClass)</span>
+<span class="nc" id="L354">                                    .collect(Collectors.toSet());</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                            if (hemispheres.size() == 2)</span>
+<span class="nc" id="L356">                                throw new DisruptedAtlasHierarchy(this.atlasObject);</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">                            return hemispheres.size() == 1;</span>
+                        }
+                );
+    }
+
+    /**
+     * Attempts to fix possible mistakes with the exclusions, such as:
+     *  &lt;ul&gt;
+     *   &lt;li&gt;Exclusion of the &quot;Root&quot; hierarchy annotation rather than a proper region&lt;/li&gt;
+     *   &lt;li&gt;If a region was excluded within the atlas hierarchy&lt;/li&gt;
+     * &lt;/ul&gt;
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     */
+    public void fixExclusions() {
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        if (this.atlasObject.getChildObjects().isEmpty())</span>
+<span class="nc" id="L372">            throw new DisruptedAtlasHierarchy(this.atlasObject);</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        if (this.atlasObject.getPathClass() == AtlasManager.EXCLUDE_CLASSIFICATION) {</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">            for (PathObject root: this.atlasObject.getChildObjects()) {</span>
+<span class="nc" id="L375">                PathObject duplicate = PathObjectTools.transformObject(root, null, true, true);</span>
+<span class="nc" id="L376">                duplicate.setPathClass(AtlasManager.EXCLUDE_CLASSIFICATION);</span>
+<span class="nc" id="L377">                this.hierarchy.addObject(duplicate);</span>
+<span class="nc" id="L378">            }</span>
+<span class="nc" id="L379">            this.atlasObject.setPathClass(null); // TODO: set the proper path class, like ABBA 0.3.2 does</span>
+        }
+<span class="nc" id="L381">        this.flatten().stream()</span>
+<span class="nc" id="L382">                .filter(</span>
+<span class="nc bnc" id="L383" title="All 4 branches missed.">                        region -&gt; region.getPathClass() != null &amp;&amp; region.getPathClass() == AtlasManager.EXCLUDE_CLASSIFICATION</span>
+<span class="nc" id="L384">                ).forEach(</span>
+<span class="nc" id="L385">                        mistakenlyExcludedRegion -&gt; this.fixMistakenlyExcludedRegion(mistakenlyExcludedRegion, this.isSplit())</span>
+                );
+<span class="nc" id="L387">    }</span>
+
+    private void fixMistakenlyExcludedRegion(PathObject mistakenlyExcludedRegion, boolean isSplit) {
+        String regionName;
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        if ((regionName = mistakenlyExcludedRegion.getName()) == null)</span>
+<span class="nc" id="L392">            throw new RuntimeException(&quot;Can't deduce the name for brain region '&quot;+mistakenlyExcludedRegion+&quot;'.&quot;);</span>
+        PathClass classification;
+<span class="nc bnc" id="L394" title="All 2 branches missed.">        if (isSplit)</span>
+<span class="nc" id="L395">            classification = PathClass.getInstance(this.getHemisphereOfMisclassifiedRegion(mistakenlyExcludedRegion),  regionName, null);</span>
+        else
+<span class="nc" id="L397">            classification = PathClass.fromString(regionName);</span>
+<span class="nc" id="L398">        List&lt;PathObject&gt; wrongDuplicates = this.hierarchy.getRootObject().getChildObjects().stream().filter(</span>
+<span class="nc bnc" id="L399" title="All 4 branches missed.">            ann -&gt; regionName.equals(ann.getName()) &amp;&amp; ann.getPathClass() == classification</span>
+<span class="nc" id="L400">        ).toList();</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        if (wrongDuplicates.isEmpty()) {</span>
+<span class="nc" id="L402">            PathObject duplicate = PathObjectTools.transformObject(mistakenlyExcludedRegion, null, true, true);</span>
+<span class="nc" id="L403">            this.hierarchy.addObject(duplicate);</span>
+<span class="nc" id="L404">            wrongDuplicates = List.of(duplicate);</span>
+        }
+<span class="nc bnc" id="L406" title="All 2 branches missed.">        for (PathObject wrongDuplicate: wrongDuplicates) {</span>
+<span class="nc" id="L407">            wrongDuplicate.setPathClass(AtlasManager.EXCLUDE_CLASSIFICATION);</span>
+<span class="nc" id="L408">        }</span>
+<span class="nc" id="L409">        mistakenlyExcludedRegion.setPathClass(classification);</span>
+<span class="nc" id="L410">    }</span>
+
+    private PathClass getHemisphereOfMisclassifiedRegion(PathObject region) {
+<span class="nc" id="L413">        PathObject hemisphereObject = region;</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        while (hemisphereObject.getParent() != this.atlasObject)</span>
+<span class="nc" id="L415">            hemisphereObject = hemisphereObject.getParent();</span>
+<span class="nc" id="L416">        Set&lt;PathClass&gt; hemisphere = flattenObject(hemisphereObject).stream()</span>
+<span class="nc" id="L417">                .map(PathObject::getPathClass)</span>
+<span class="nc bnc" id="L418" title="All 6 branches missed.">                .filter(c -&gt; c.isDerivedClass() &amp;&amp; (c.isDerivedFrom(ABBA_LEFT) || c.isDerivedFrom(ABBA_RIGHT)))</span>
+<span class="nc" id="L419">                .map(PathClass::getParentClass)</span>
+<span class="nc" id="L420">                .collect(Collectors.toSet());</span>
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (hemisphere.size() != 1)</span>
+<span class="nc" id="L422">            throw new RuntimeException(&quot;Can't deduce the hemisphere for '&quot;+region+&quot;'.&quot;);</span>
+<span class="nc" id="L423">        return hemisphere.iterator().next();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
