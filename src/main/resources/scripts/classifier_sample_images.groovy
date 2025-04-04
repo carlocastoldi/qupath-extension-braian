@@ -17,18 +17,20 @@ import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.QuPathGUI
 import qupath.lib.projects.ProjectImageEntry;
 import qupath.lib.projects.ProjectIO;
+import static qupath.lib.scripting.QP.*;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 var SAMPLE_PER_PROJECT = 3
+var PROJECT_FILE_NAME = "project"
 
 var projDir = "/path/to/QuPath/projects"
 var groupsProjects = [
-    ["1R",  "3R",  "4R",  "11R"],
-    ["5S",  "8S",  "10S", "13S"],
-    ["16C", "17C", "18C", "19C"],
+    ["animal1", "animal2",  "animal3",  "animal4"],
+    ["animal5", "animal6",  "animal7",  "animal8"],
+    ["animal9", "animal10", "animal11", "animal12"],
 ]
 
 // SCRIPT START ///////////////////////////////////
@@ -48,7 +50,7 @@ groupsProjects = groupsProjects.flatten()
 println "Selected projects to sample from: $groupsProjects"
 
 List<ProjectImageEntry<BufferedImage>> projectImages = groupsProjects.collect { sampledProject ->
-    sampleImagesFromProject(projDir, sampledProject, SAMPLE_PER_PROJECT)
+    sampleImagesFromProject(projDir, sampledProject, PROJECT_FILE_NAME, SAMPLE_PER_PROJECT, project.getImageList())
 }.flatten()
 
 println "Sampled ${projectImages.size()} images: $projectImages"
@@ -72,10 +74,15 @@ def sameNumberPerGroup(Collection<Collection> ll) {
     }
 }
 
-def sampleImagesFromProject(String projectsDir, String projectName, int n) {
-    var projectFile = Paths.get(projectsDir, projectName, "project."+ProjectIO.DEFAULT_PROJECT_EXTENSION)
+def sampleImagesFromProject(String projectsDir, String projectName, String projectFileName, int n, List<ProjectImageEntry<BufferedImage>> sampled) {
+    var alreadySampledImages = sampled.collect { it.getImageName() }
+    var projectFile = Paths.get(projectsDir, projectName, projectFileName+"."+ProjectIO.DEFAULT_PROJECT_EXTENSION)
     var tempProject = ProjectIO.loadProject(GeneralTools.toURI(projectFile.toString()), BufferedImage.class);
-    var tempImages = tempProject.getImageList()
+    var tempImages = tempProject.getImageList().findAll { tempImage ->
+        !(tempImage.getImageName() in alreadySampledImages)
+    }
     Collections.shuffle(tempImages)
+    if (tempImages.size() < n)
+        return tempImages[0..tempImages.size()-1]
     return tempImages[0..n-1]
 }

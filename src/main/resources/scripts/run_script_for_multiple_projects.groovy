@@ -16,25 +16,31 @@
  */
 import qupath.fx.utils.FXUtils
 import qupath.lib.gui.commands.Commands
-import qupath.lib.gui.scripting.QPEx;
+import qupath.lib.gui.scripting.QPEx
 import qupath.lib.projects.ProjectIO
-import java.awt.image.BufferedImage;
+import java.awt.image.BufferedImage
 import java.nio.file.Paths
 
 PROJECTS_DIR = "/path/to/QuPath_projects/"
+PROJECT_FILE_NAME = "project"
 PROJECT_NAMES = [
-    "287HC",  "342HC", "343HC",  "346HC",  "371HC",
-    "329CTX", "331CTX", "355CTX", "400CTX", "401CTX", "402CTX",
-    "367FC",  "368FC",  "369FC",  "426FC",  "427FC",  "428FC",
+    "animal1", "animal2",  "animal3",  "animal4",
+    "animal5", "animal6",  "animal7",  "animal8",
+    "animal9", "animal10", "animal11", "animal12",
 ]
 
 SCRIPT_PATH = "/path/to/script.groovy"
 
-def qupathGUI = QPEx.getQuPath()
+var qupathGUI = QPEx.getQuPath()
+var script = new File(script)
+if (!script.exists()) {
+    println "Can't find the given script: "+script
+    return
+}
 PROJECT_NAMES.each {
-    var projectFile = Paths.get(PROJECTS_DIR, it, "project.qpproj").toFile()
+    var projectFile = Paths.get(PROJECTS_DIR, it, projectFileName+"."+ProjectIO.DEFAULT_PROJECT_EXTENSION).toFile()
     var thisProject = ProjectIO.loadProject(projectFile, BufferedImage.class)
     FXUtils.runOnApplicationThread({qupathGUI.setProject(thisProject)})
-    run(new File(SCRIPT_PATH))
+    run(script)
     FXUtils.runOnApplicationThread({Commands.closeProject(qupathGUI)})
 }
