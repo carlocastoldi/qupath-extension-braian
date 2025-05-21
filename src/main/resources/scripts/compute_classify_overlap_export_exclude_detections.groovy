@@ -78,6 +78,7 @@ if ((control = config.getControlChannel()).isPresent() ) {
 var atlasName = "allen_mouse_10um_java"
 if (AtlasManager.isImported(atlasName, hierarchy)) {
     var atlas = new AtlasManager(atlasName, hierarchy)
+    atlas.fixExclusions() // just in case
 
     INVALID_CHARS_WIN = ['<', '>' ,':', '"', '/', '\\', '|', '?', '*'] as Set<Character>
     INVALID_CHARS_NIX = ['/'] as Set<Character>
@@ -88,7 +89,6 @@ if (AtlasManager.isImported(atlasName, hierarchy)) {
     atlas.saveResults(allDetections + overlaps, resultsFile)
 
     def exclusionsFile = new File(buildPathInProject("regions_to_exclude", imageName + "_regions_to_exclude.txt"))
-    atlas.fixExclusions() // just in case
     atlas.saveExcludedRegions(exclusionsFile)
 }
 
