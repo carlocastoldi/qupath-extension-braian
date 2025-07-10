@@ -30,11 +30,8 @@ jobs:
           java-version: 21
           distribution: temurin
 
-      - name: Validate Gradle wrapper
-        uses: gradle/wrapper-validation-action@v2
-
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Download dependencies # used by by Gradle for jacocoTestReport.printJacocoCoverage
         run: sudo apt-get install libxml2-utils
