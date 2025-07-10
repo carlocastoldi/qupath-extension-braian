@@ -9,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.actions.ActionTools;
-import qupath.lib.gui.extensions.GitHubProject;
 import qupath.lib.gui.extensions.QuPathExtension;
 import qupath.lib.gui.tools.MenuTools;
 import qupath.lib.objects.PathObject;
@@ -23,7 +22,7 @@ import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-public class BraiAnExtension implements QuPathExtension, GitHubProject {
+public class BraiAnExtension implements QuPathExtension {
 
     private static final String menuPosition = "Extensions>BraiAn";
 
@@ -34,14 +33,6 @@ public class BraiAnExtension implements QuPathExtension, GitHubProject {
      */
     public static Logger getLogger() {
         return logger;
-    }
-
-    /**
-     * @return the repository where the extension is hosted
-     */
-    @Override
-    public GitHubRepo getRepository() {
-        return GitHubRepo.create("BraiAn extension", "carlocastoldi", "qupath-extension-braian");
     }
 
     /**
@@ -144,6 +135,6 @@ public class BraiAnExtension implements QuPathExtension, GitHubProject {
      */
     @Override
     public String getDescription() {
-        return "A collection of tools for whole-brain data extraction";
+        return "A collection of tools for whole-brain data quantification and extraction";
     }
 }
