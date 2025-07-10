@@ -366,6 +366,7 @@ public class AtlasManager {
      *  <ul>
      *   <li>Exclusion of the "Root" hierarchy annotation rather than a proper region</li>
      *   <li>If a region was excluded within the atlas hierarchy</li>
+     *   <li>If a region's classifications was removed</li>
      * </ul>
      * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
      */
@@ -382,7 +383,9 @@ public class AtlasManager {
         }
         this.flatten().stream()
                 .filter(
-                        region -> region.getPathClass() != null && region.getPathClass() == AtlasManager.EXCLUDE_CLASSIFICATION
+                        region ->
+                                        (region.getPathClass() != null && region.getPathClass() == AtlasManager.EXCLUDE_CLASSIFICATION) ||
+                                        (region.getPathClass() == null && region != this.atlasObject)
                 ).forEach(
                         mistakenlyExcludedRegion -> this.fixMistakenlyExcludedRegion(mistakenlyExcludedRegion, this.isSplit())
                 );
@@ -417,7 +420,7 @@ public class AtlasManager {
             hemisphereObject = hemisphereObject.getParent();
         Set<PathClass> hemisphere = flattenObject(hemisphereObject).stream()
                 .map(PathObject::getPathClass)
-                .filter(c -> c.isDerivedClass() && (c.isDerivedFrom(ABBA_LEFT) || c.isDerivedFrom(ABBA_RIGHT)))
+                .filter(c -> c != null && c.isDerivedClass() && (c.isDerivedFrom(ABBA_LEFT) || c.isDerivedFrom(ABBA_RIGHT)))
                 .map(PathClass::getParentClass)
                 .collect(Collectors.toSet());
         if (hemisphere.size() != 1)
