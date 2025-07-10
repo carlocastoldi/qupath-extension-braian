@@ -44,6 +44,19 @@ If you use BraiAn in your work, please cite the paper below, currently in pre-pr
 > Chiaruttini, N., Castoldi, C. et al. **ABBA, a novel tool for whole-brain mapping, reveals brain-wide differences in immediate early genes induction following learning**. _bioRxiv_ (2024).
 > [https://doi.org/10.1101/2024.09.06.611625](https://doi.org/10.1101/2024.09.06.611625)
 
+## Installation
+### Manual
+For simpler installations, you can simply drag and drop the `qupath-extension-braian-X.Y.Z.jar` file within the QuPath interface, and you're done.
+You can download the latest `qupath-extension-braian-X.Y.Z.jar` file from the [last release](https://github.com/carlocastoldi/qupath-extension-braian/releases/latest). 
+
+### With QuPath 0.6.+ _Catalogs_
+Since QuPath 0.6.+, if you want to install third-party extensions and keep them up to date, you have to add a third-party _Catalog_ to your QuPath installation.
+For BraiAn, you can do this by:
++ Opening QuPath's extension manager by clicking on `Extensions` -> `Manage extensions` in QuPath;
++ Clicking on `Manage extension catalogs`;
++ Pasting the following URL, and then clicking on the `Add` button: `https://github.com/carlocastoldi/qupath-extension-braian-catalog`;
++ Clicking on the + symbol next to BraiAn extension in the extension manager.
+
 ## Contributing
 
 We decided to publish the BraiAn pipeline (i.e. this QuPath extension and the twin [python libray](https://codeberg.org/SilvaLab/BraiAn)) with the most libre licence possible because we find maximum value in learning from others and sharing our own—small—knowledge.
