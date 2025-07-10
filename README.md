@@ -46,17 +46,19 @@ If you use BraiAn in your work, please cite the paper below, currently in pre-pr
 
 ## Installation
 ### Manual
-For simpler installations, you can simply drag and drop the `qupath-extension-braian-X.Y.Z.jar` file within the QuPath interface, and you're done.
-You can download the latest `qupath-extension-braian-X.Y.Z.jar` file from the [last release](https://github.com/carlocastoldi/qupath-extension-braian/releases/latest). 
+You can download the [latest](https://github.com/carlocastoldi/qupath-extension-braian/releases/latest) release from the the official GitHub page of the project named `qupath-extension-braian-<VERSION>.jar`. Generally, there is no need to download `-javadoc.jar` and `-sources.jar`.\
+Later you can drag the downloaded file onto QuPath, restart and be good to go!
+
+Up until QuPath 0.5.1 (included), new extension releases are notified by QuPath on startups. You'll then be able to update them through QuPath's extension manager with one click.\
+From QuPath 0.6.+, extensions installed manually no longer receive updates.
 
 ### With QuPath 0.6.+ _Catalogs_
-Since QuPath 0.6.+, if you want to install third-party extensions and keep them up to date, you have to add a third-party _Catalog_ to your QuPath installation.
+Since QuPath 0.6.+, if you want to install third-party extensions and keep them up to date, you'll have to add a third-party _Catalog_ to your QuPath installation.\
 For BraiAn, you can do this by:
 + Opening QuPath's extension manager by clicking on `Extensions` -> `Manage extensions` in QuPath;
 + Clicking on `Manage extension catalogs`;
 + Pasting the following URL, and then clicking on the `Add` button: `https://github.com/carlocastoldi/qupath-extension-braian-catalog`;
 + Clicking on the + symbol next to BraiAn extension in the extension manager.
-
 ## Contributing
 
 We decided to publish the BraiAn pipeline (i.e. this QuPath extension and the twin [python libray](https://codeberg.org/SilvaLab/BraiAn)) with the most libre licence possible because we find maximum value in learning from others and sharing our own—small—knowledge.
