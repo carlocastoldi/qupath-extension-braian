@@ -1056,8 +1056,9 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                         var imageData = viewer.getImageData();
                         if (imageData != null) {
                             classifier.classifyObjects(imageData, true);
-                            imageData.getHistoryWorkflow().addStep(
-                                    ObjectClassifierLoadCommand.createObjectClassifierStep(classifierName));
+                            // TODO: create new workflow for QuPath
+                            // imageData.getHistoryWorkflow().addStep(
+                            //         ObjectClassifierLoadCommand.createObjectClassifierStep(classifierName));
                         }
                     }
                     return true;
