@@ -15,10 +15,9 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.Priority;
+import javafx.scene.layout.*;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.Stage;
 import org.bytedeco.javacpp.PointerScope;
 import org.bytedeco.javacpp.indexer.UByteIndexer;
@@ -46,6 +45,7 @@ import qupath.lib.gui.dialogs.ProjectDialogs;
 import qupath.lib.gui.tools.ColorToolsFX;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.images.ImageData;
+import qupath.lib.objects.PathAnnotationObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectFilter;
 import qupath.lib.objects.PathObjectTools;
@@ -54,6 +54,7 @@ import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.objects.hierarchy.events.PathObjectHierarchyEvent;
 import qupath.lib.objects.hierarchy.events.PathObjectHierarchyListener;
 import qupath.lib.projects.ProjectImageEntry;
+import qupath.lib.roi.PointsROI;
 import qupath.opencv.ml.OpenCVClassifiers;
 import qupath.opencv.ml.objects.OpenCVMLClassifier;
 import qupath.opencv.ml.objects.features.FeatureExtractor;
@@ -65,6 +66,7 @@ import qupath.process.gui.commands.ml.ProjectClassifierBindings;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.*;
@@ -93,7 +95,6 @@ public class BraiAnObjectClassifierCommand implements Runnable {
 
     // TODO: Check use of static dialog
     private Stage dialog;
-    //	private ClassifierBuilderPanel<PathObjectClassifier> panel;
 
     /**
      * Constructor.
@@ -273,10 +274,18 @@ public class BraiAnObjectClassifierCommand implements Runnable {
          * Visualization of the training object proportions
          */
         private PieChart pieChart;
-
+        private PieChart pieChartTest;
         private ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("object-classifier", true));
         private FutureTask<ObjectClassifier<BufferedImage>> classifierTask;
+        private VBox evaluationPanel;
+        private Label lblConfMatrix;
+        private Label lblPrecision, lblRecall, lblF1, lblKappa;
+        private GridPane confusionGrid;
+        private Label cellTP, cellFN, cellFP, cellTN;
 
+        private PathClass positiveClass = PathClass.fromString("none");
+        private PathClass negativeClass = PathClass.fromString("none");
+        private double trainingSplitRatio = 0.8;
         BraiAnObjectClassifierPane(QuPathGUI qupath) {
             this.qupath = qupath;
             selectedClasses.addAll(qupath.getAvailablePathClasses());
@@ -400,7 +409,6 @@ public class BraiAnObjectClassifierCommand implements Runnable {
         }
 
 
-
         private boolean promptToLoadTrainingImages() {
             var project = qupath.getProject();
             if (project == null) {
@@ -411,16 +419,47 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             var listView = ProjectDialogs.createImageChoicePane(qupath, project.getImageList(), trainingEntries,
                     "Specified image is open!");
 
-            var pane = new BorderPane(listView);
-            pane.setTop(new Label("Select images to use for training the object classifier.\n"
-                    + "Note that more images will require more memory and more processing time!"));
+            var labelInfo = new Label("Select images to use for training the object classifier.\n"
+                    + "Note that more images will require more memory and more processing time!");
 
-            if (Dialogs.builder()
-                    .title("Object classifier training images")
-                    .content(pane)
-                    .resizable()
-                    .buttons(ButtonType.APPLY, ButtonType.CANCEL)
-                    .showAndWait().orElse(ButtonType.CANCEL) == ButtonType.CANCEL)
+            var labelSplit = new Label("Train/Test split (0–1):");
+            var tfSplit = new TextField(Double.toString(this.trainingSplitRatio));
+            tfSplit.setMaxWidth(80);
+            tfSplit.setPromptText("e.g. 0.8");
+
+            var topPane = new VBox(8, labelInfo, new HBox(10, labelSplit, tfSplit));
+            topPane.setPadding(new Insets(10));
+
+            var pane = new BorderPane(listView);
+            pane.setTop(topPane);
+
+            Dialog<ButtonType> dialog = new Dialog<>();
+            dialog.setTitle("Object classifier training images");
+            dialog.getDialogPane().setContent(pane);
+            dialog.getDialogPane().getButtonTypes().addAll(ButtonType.APPLY, ButtonType.CANCEL);
+            dialog.setResizable(true);
+
+
+            dialog.setResultConverter(dialogButton -> {
+                if (dialogButton == ButtonType.APPLY) {
+                    try {
+                        double val = Double.parseDouble(tfSplit.getText());
+                        if (val >= 0.0 && val <= 1.0) {
+                            this.trainingSplitRatio = val;
+                            logger.info("Training split ratio updated to {}", val);
+                        } else {
+                            logger.warn("Invalid training split ratio: {}", val);
+                        }
+                    } catch (NumberFormatException e) {
+                        logger.warn("Invalid training split ratio input: not a number");
+                    }
+                }
+                return dialogButton;
+            });
+
+
+            Optional<ButtonType> result = dialog.showAndWait();
+            if (result.isEmpty() || result.get() != ButtonType.APPLY)
                 return false;
 
             trainingEntries.clear();
@@ -477,14 +516,18 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                             filter,
                             imageData,
                             annotations,
-                            output == OutputClasses.ALL ? null : selectedClasses);
+                            output == OutputClasses.ALL ? null : selectedClasses,
+                            trainingSplitRatio);
+                    var entry = qupath.getProject().getEntry(imageData);
+                    if (entry != null)
+                        entry.saveImageData(imageData);
                     training.add(temp);
                 }
 
                 if (training.isEmpty() || Thread.interrupted())
                     return null;
 
-                long nTrainingObjects = training.stream().mapToLong(t -> t.map.size()).sum();
+                long nTrainingObjects = training.stream().mapToLong(t -> t.trainMap.size()).sum();
                 if (nTrainingObjects <= 1L) {
                     Dialogs.showErrorNotification("Object classifier", "You need to annotate objects with at least two classifications to train a classifier!");
                     return null;
@@ -634,44 +677,65 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                 PathObjectFilter filter,
                 ImageData<T> imageData,
                 TrainingAnnotations training,
-                Collection<PathClass> selectedClasses) {
+                Collection<PathClass> selectedClasses,
+                double trainingSplitRatio) {
 
-            Map<PathClass, Set<PathObject>> map = new TreeMap<>();
+            Map<PathClass, Set<PathObject>> trainMap = new TreeMap<>();
+            Map<PathClass, Set<PathObject>> testMap = new TreeMap<>();
 
-            // Get training annotations & associated objects
             var hierarchy = imageData.getHierarchy();
             var trainingAnnotations = getTrainingAnnotations(hierarchy, training);
 
             if (Thread.interrupted())
                 return null;
 
-            // Use a set for detections because we might need to check if we have the same detection for multiple classes
             var filterNegated = filter.negate();
             for (var annotation : trainingAnnotations) {
                 var pathClass = annotation.getPathClass();
                 if (selectedClasses == null || selectedClasses.contains(pathClass)) {
-                    // Use a TreeSet ordered by ID
-                    // This is to overcome https://github.com/qupath/qupath/issues/1016
-                    var set = map.computeIfAbsent(pathClass, p -> new TreeSet<>(Comparator.comparing(PathObject::getID)));
+                    var allObjects = new ArrayList<PathObject>();
                     var roi = annotation.getROI();
+
                     if (roi.isPoint()) {
-                        for (Point2 p : annotation.getROI().getAllPoints()) {
+                        for (Point2 p : roi.getAllPoints()) {
                             var pathObjectsTemp = PathObjectTools.getObjectsForLocation(
                                     hierarchy, p.getX(), p.getY(), roi.getZ(), roi.getT(), -1);
                             pathObjectsTemp.removeIf(filterNegated);
-                            set.addAll(pathObjectsTemp);
+                            allObjects.addAll(pathObjectsTemp);
                         }
                     } else {
-                        var pathObjectsTemp = hierarchy.getAllDetectionsForROI(annotation.getROI());
+                        var pathObjectsTemp = hierarchy.getAllDetectionsForROI(roi);
                         pathObjectsTemp.removeIf(filterNegated);
-                        set.addAll(pathObjectsTemp);
+                        allObjects.addAll(pathObjectsTemp);
                     }
+
+                    // Random shuffle
+                    Collections.shuffle(allObjects);
+
+                    int splitIndex = (int) (allObjects.size() * trainingSplitRatio);
+                    var trainList = allObjects.subList(0, splitIndex);
+                    var testList = allObjects.subList(splitIndex, allObjects.size());
+                    for (PathObject obj : trainList) {
+                        obj.getMeasurementList().put("SetType", 1.0);
+                    }
+                    for (PathObject obj : testList) {
+                        obj.getMeasurementList().put("SetType", 0.0);
+                    }
+
+                    var trainSet = trainMap.computeIfAbsent(pathClass, p -> new HashSet<>());
+                    var testSet = testMap.computeIfAbsent(pathClass, p -> new HashSet<>());
+                    trainSet.addAll(trainList);
+                    testSet.addAll(testList);
+
                 }
             }
 
-            map.entrySet().removeIf(e -> e.getValue().isEmpty());
-            return new TrainingData<>(imageData, map);
+            trainMap.entrySet().removeIf(e -> e.getValue().isEmpty());
+            testMap.entrySet().removeIf(e -> e.getValue().isEmpty());
+
+            return new TrainingData<>(imageData, trainMap, testMap);
         }
+
 
         /**
          * Train an object classifier.
@@ -729,17 +793,20 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             }
             var counts = new LinkedHashMap<PathClass, Integer>();
             for (var t : training) {
-                for (var entry : t.map.entrySet()) {
+                for (var entry : t.trainMap.entrySet()) {
                     var key = entry.getKey();
                     Integer total = counts.getOrDefault(key, 0) + entry.getValue().size();
                     counts.put(entry.getKey(), total);
                 }
             }
-            ChartTools.setPieChartData(pieChart, counts, PathClass::toString, p -> ColorToolsFX.getCachedColor(p.getColor()), true, !counts.isEmpty());
+            ChartTools.setPieChartData(pieChart, counts, PathClass::toString, p -> ColorToolsFX.getCachedColor(p.getColor()), false, !counts.isEmpty());
             if (counts.isEmpty())
-                pieChart.setTitle(null);
+                pieChart.setTitle("No data");
             else
                 pieChart.setTitle("Training data");
+
+            updatePieChartTest(training);
+
         }
 
         void updatePieChart(Map<PathClass, Set<PathObject>> map) {
@@ -754,24 +821,54 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             ChartTools.setPieChartData(pieChart, counts, PathClass::toString, p -> ColorToolsFX.getCachedColor(p.getColor()), true, !map.isEmpty());
         }
 
-
-
-        static class TrainingData<T>{
-
-            private ImageData<T> imageData;
-            private Map<PathClass, Set<PathObject>> map;
-
-            private TrainingData(ImageData<T> imageData, Map<PathClass, Set<PathObject>> map) {
-                this.imageData = imageData;
-                this.map = map;
+        <T> void updatePieChartTest(Collection<TrainingData<T>> training) {
+            if (!Platform.isFxApplicationThread()) {
+                Platform.runLater(() -> updatePieChartTest(training));
+                return;
             }
-
-            public Collection<PathClass> getPathClasses() {
-                return map.keySet();
+            var counts = new LinkedHashMap<PathClass, Integer>();
+            for (var t : training) {
+                for (var entry : t.testMap.entrySet()) {
+                    var key = entry.getKey();
+                    Integer total = counts.getOrDefault(key, 0) + entry.getValue().size();
+                    counts.put(entry.getKey(), total);
+                }
             }
-
+            ChartTools.setPieChartData(pieChartTest, counts, PathClass::toString,
+                    p -> ColorToolsFX.getCachedColor(p.getColor()), false, !counts.isEmpty());
+            if (counts.isEmpty())
+                pieChartTest.setTitle("No data");
+            else
+                pieChartTest.setTitle("Test data");
         }
 
+
+        static class TrainingData<T> {
+
+            private ImageData<T> imageData;
+            private Map<PathClass, Set<PathObject>> trainMap;
+            private Map<PathClass, Set<PathObject>> testMap;
+
+            private TrainingData(ImageData<T> imageData, Map<PathClass, Set<PathObject>> trainMap, Map<PathClass, Set<PathObject>> testMap) {
+                this.imageData = imageData;
+                this.trainMap = trainMap;
+                this.testMap = testMap;
+            }
+
+            public Map<PathClass, Set<PathObject>> getTrainMap() {
+                return trainMap;
+            }
+
+            public Map<PathClass, Set<PathObject>> getTestMap() {
+                return testMap;
+            }
+            public Map<PathClass, Set<PathObject>> getMap() {
+                return trainMap;
+            }
+            public Collection<PathClass> getPathClasses() {
+                return trainMap.keySet();
+            }
+        }
 
         static <T> List<PathClass> getPathClasses(Collection<TrainingData<T>> training) {
             Set<PathClass> classSet = new HashSet<>();
@@ -828,7 +925,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                  var scope = new PointerScope()) {
                 for (var training : trainingCollection) {
                     var imageData = training.imageData;
-                    var map = training.map;
+                    var map = training.trainMap;
 
                     int nFeatures = extractor.nFeatures();
                     int nSamples = map.values().stream().mapToInt(l -> l.size()).sum();
@@ -1272,15 +1369,25 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             pieChart = new PieChart();
             pieChart.getStyleClass().add("training-chart");
             pieChart.setAnimated(false);
-
             pieChart.setLabelsVisible(false);
             pieChart.setLegendVisible(true);
             pieChart.setPrefSize(40, 40);
-            pieChart.setMaxSize(100, 100);
             pieChart.setLegendSide(Side.RIGHT);
-            pieChart.setMaxWidth(Double.MAX_VALUE);
-            GridPane.setVgrow(pieChart, Priority.ALWAYS);
-            pane.add(pieChart, 0, row++, pane.getColumnCount(), 1);
+            pieChart.setTitle("Training data");
+
+// New pie chart for test proportion
+            pieChartTest = new PieChart();
+            pieChartTest.getStyleClass().add("training-chart");
+            pieChartTest.setAnimated(false);
+            pieChartTest.setLabelsVisible(false);
+            pieChartTest.setLegendVisible(true);
+            pieChartTest.setPrefSize(40, 40);
+            pieChartTest.setLegendSide(Side.RIGHT);
+            pieChartTest.setTitle("Test data");
+
+            HBox pieBox = new HBox(20, pieChart, pieChartTest);
+            pieBox.setAlignment(Pos.CENTER);
+            pane.add(pieBox, 0, row++, pane.getColumnCount(), 1);
 
             // Label showing cursor location
             var labelCursor = new Label();
@@ -1289,6 +1396,117 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             labelCursor.setAlignment(Pos.CENTER);
             labelCursor.setTooltip(new Tooltip("Prediction for current cursor location"));
             pane.add(labelCursor, 0, row++, pane.getColumnCount(), 1);
+
+            // Classes for evaluation
+            Button btnChooseClasses = new Button("Classes for evaluation");
+            btnChooseClasses.setOnAction(e -> showClassSelectionDialog());
+            pane.add(btnChooseClasses, 0, row++, 2, 1);
+
+// Bouton for evaluation
+            var btnEvaluateTest = new Button("Evaluate Test Set");
+            btnEvaluateTest.setMaxWidth(Double.MAX_VALUE);
+            btnEvaluateTest.setTooltip(new Tooltip("Évalue les prédictions du classifieur sur les objets test (SetType = 0.0)"));
+
+            btnEvaluateTest.setOnAction(e -> {
+                new Thread(() -> {
+                    // Récupérer le classifieur actuel s’il est prêt
+                    if (classifierTask == null) {
+                        logger.warn("Classifier non encore entraîné !");
+                        return;
+                    }
+
+                    ObjectClassifier<BufferedImage> classifier;
+                    try {
+                        classifier = classifierTask.get(); // attendre que le training soit fini
+                    } catch (Exception ex) {
+                        logger.error("Erreur récupération classifieur", ex);
+                        return;
+                    }
+
+                    if (classifier == null) {
+                        logger.warn("Classifieur nul, impossible de classifier les images");
+                        return;
+                    }
+
+
+
+                    // evaluate the test set
+                    evaluateTestSet(classifier);
+
+                }).start();
+            });
+
+            pane.add(btnEvaluateTest, 0, row++, pane.getColumnCount(), 1);
+
+// Panel for evaluation results
+            evaluationPanel = new VBox(8);
+            evaluationPanel.setPadding(new Insets(10));
+            evaluationPanel.setStyle("-fx-border-color: lightgray; -fx-border-width: 1px; -fx-background-color: #f9f9f9;");
+            evaluationPanel.setAlignment(Pos.TOP_LEFT);
+
+// Confusion matrix header
+            lblConfMatrix = new Label("Confusion matrix :");
+            lblConfMatrix.setStyle("-fx-font-family: monospace; -fx-font-weight: bold;");
+
+// Metrics labels
+            lblPrecision = new Label();
+            lblRecall = new Label();
+            lblF1 = new Label();
+            lblKappa = new Label();
+            confusionGrid = new GridPane();
+            confusionGrid.setHgap(15);
+            confusionGrid.setVgap(10);
+            confusionGrid.setPadding(new Insets(10));
+            confusionGrid.setAlignment(Pos.CENTER_LEFT);
+            confusionGrid.setStyle("-fx-border-color: #ccc; -fx-border-width: 1px; -fx-background-color: #f0f0f0;");
+
+//
+            Label header1 = new Label("");
+            Label header2 = new Label("Pred: Pos ");  // Class positive (TP)
+            Label header3 = new Label("Pred:  Neg");  // Class négative (TN)
+
+            header2.setStyle("-fx-font-weight: bold;");
+            header3.setStyle("-fx-font-weight: bold;");
+
+//
+            confusionGrid.add(header1, 0, 0);
+            confusionGrid.add(header2, 1, 0);
+            confusionGrid.add(header3, 2, 0);
+
+//
+            Label row1 = new Label("True: Pos");  // Class positive (TP)
+            row1.setStyle("-fx-font-weight: bold;");
+            Label row2 = new Label("True: Neg");  // Class négative (TN)
+            row2.setStyle("-fx-font-weight: bold;");
+
+//
+            confusionGrid.add(row1, 0, 1);
+            confusionGrid.add(row2, 0, 2);
+
+//
+            cellTP = new Label("-");
+            cellFN = new Label("-");
+            cellFP = new Label("-");
+            cellTN = new Label("-");
+
+//
+            confusionGrid.add(cellTP, 1, 1);
+            confusionGrid.add(cellFN, 2, 1);
+            confusionGrid.add(cellFP, 1, 2);
+            confusionGrid.add(cellTN, 2, 2);
+
+// add confusion matrix and the 4 other metrics
+            evaluationPanel.getChildren().addAll(
+                    confusionGrid,
+                    new Separator(),
+                    lblPrecision,
+                    lblRecall,
+                    lblF1,
+                    lblKappa
+            );
+
+            pane.add(evaluationPanel, 0, row++, pane.getColumnCount(), 1);
+
 
             /*
              * Save classifier
@@ -1339,7 +1557,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                 return false;
             }
 
-            var featuresPane = new SelectionPane<>(measurements, true);
+            var featuresPane = new BraiAnSelectionPane<>(measurements, true);
             featuresPane.selectItems(selectedMeasurements);
 
             if (Dialogs.builder()
@@ -1362,7 +1580,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                 return false;
             }
             var pathClasses = annotations.stream().map(p -> p.getPathClass()).collect(Collectors.toCollection(TreeSet::new));
-            var classesPane = new SelectionPane<>(pathClasses, true);
+            var classesPane = new BraiAnSelectionPane<>(pathClasses, true);
             classesPane.selectItems(selectedClasses);
 
             if (Dialogs.builder()
@@ -1452,6 +1670,274 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             invalidateClassifier();
         }
 
+
+
+
+
+        //function to choose classes for the evaluation (binary task prediction)
+        private void showClassSelectionDialog() {
+            //
+            Set<PathClass> availableClasses = new HashSet<>();
+
+            // read first image
+            var project = qupath.getProject();
+            if (project == null) {
+                logger.error("Aucun projet trouvé !");
+                return;
+            }
+
+            try {
+                //
+                var firstImageData = project.getImageList().get(0).readImageData();  // On lit les données de la première image
+
+                // get classes
+                for (PathObject obj : firstImageData.getHierarchy().getFlattenedObjectList(null)) {
+                    PathClass pc = obj.getPathClass();
+                    if (pc != null) {
+                        availableClasses.add(pc);  // Ajouter la classe à l'ensemble
+                    }
+                }
+            } catch (IOException e) {
+                logger.error("Erreur lors de la lecture de l'image", e);
+                return;
+            }
+
+
+            List<PathClass> classList = availableClasses.stream()
+                    .sorted(Comparator.comparing(PathClass::getName))
+                    .toList();
+
+            // create positive and negative classes for the following test
+            ComboBox<PathClass> comboPositive = new ComboBox<>(FXCollections.observableArrayList(classList));
+            ComboBox<PathClass> comboNegative = new ComboBox<>(FXCollections.observableArrayList(classList));
+            comboPositive.setValue(positiveClass);
+            comboNegative.setValue(negativeClass);
+
+
+            GridPane grid = new GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+            grid.setPadding(new Insets(20, 150, 10, 10));
+
+            grid.add(new Label("Classe positive (TP) :"), 0, 0);
+            grid.add(comboPositive, 1, 0);
+            grid.add(new Label("Classe négative (TN) :"), 0, 1);
+            grid.add(comboNegative, 1, 1);
+
+
+            Dialog<ButtonType> dialog = new Dialog<>();
+            dialog.setTitle("Choose evaluation classes");
+            dialog.getDialogPane().setContent(grid);
+            dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+
+            Optional<ButtonType> result = dialog.showAndWait();
+            if (result.isPresent() && result.get() == ButtonType.OK) {
+                // update
+                positiveClass = comboPositive.getValue();
+                negativeClass = comboNegative.getValue();
+            }
+        }
+
+        private void classifyAllProjectImages(ObjectClassifier<BufferedImage> classifier) {
+            var project = qupath.getProject();
+            if (project == null)
+                return;
+
+            for (var entry : trainingEntries) {
+                try {
+                    var imageData = entry.readImageData();
+                    var pathObjects = classifier.getCompatibleObjects(imageData);
+                    if (classifier.classifyObjects(imageData, pathObjects, true) > 0) {
+                        imageData.getHierarchy().fireObjectClassificationsChangedEvent(this, pathObjects);
+                    }
+                    entry.saveImageData(imageData);
+                } catch (Exception e) {
+                    logger.error("Erreur classification image {} : {}", entry.getImageName(), e.getMessage());
+                }
+            }
+        }
+
+
+        private void evaluateTestSet(ObjectClassifier<BufferedImage> classifier) {
+            var project = qupath.getProject();
+            if (project == null) {
+                logger.error("Aucun projet chargé.");
+                return;
+            }
+
+            // Initialize
+            // Apply classifier to all images
+            classifyAllProjectImages(classifier);
+            int TP = 0, TN = 0, FP = 0, FN = 0;
+
+            // Interactive classes
+            PathClass positiveClass = this.positiveClass;  // Classe positive (sélectionnée par l'utilisateur)
+            PathClass negativeClass = this.negativeClass;  // Classe négative (sélectionnée par l'utilisateur)
+
+            // test for each image of the training
+            for (var entry : trainingEntries) {
+                ImageData<BufferedImage> imageData;
+                try {
+                    imageData = entry.readImageData();  // Lire l'image
+                } catch (Exception e) {
+                    logger.error("Erreur lecture image {}", entry.getImageName(), e);
+                    continue;
+                }
+
+                var hierarchy = imageData.getHierarchy();
+
+                // Test object = object with settype = 0
+                var testObjects = hierarchy.getDetectionObjects().stream()
+                        .filter(obj -> obj.getMeasurementList().get("SetType") == 0.0)
+                        .toList();
+
+
+                List<PathAnnotationObject> anns = hierarchy.getAnnotationObjects().stream()
+                        .filter(obj -> obj instanceof PathAnnotationObject)
+                        .map(obj -> (PathAnnotationObject) obj)
+                        .toList();
+
+                // Annotation points TP = pointsCy5ROI
+                var pointsCy5ROI = anns.stream()
+                        .filter(a -> positiveClass.equals(a.getPathClass()) && a.getROI() instanceof PointsROI)
+                        .findFirst();
+
+                // Annotation points TP = pointsOtherROI
+                var pointsOtherROI = anns.stream()
+                        .filter(a -> negativeClass.equals(a.getPathClass()) && a.getROI() instanceof PointsROI)
+                        .findFirst();
+
+                // Si les annotations ne sont pas présentes, ignorer l'image
+                if (pointsCy5ROI.isEmpty() || pointsOtherROI.isEmpty()) {
+                    logger.warn("Image {} ignored — Annotations is missing", entry.getImageName());
+                    continue;
+                }
+
+                var cy5Points = ((PointsROI) pointsCy5ROI.get().getROI()).getAllPoints();
+                var otherPoints = ((PointsROI) pointsOtherROI.get().getROI()).getAllPoints();
+
+                // Keep only the annotation for test object
+                var filteredCy5 = cy5Points.stream().filter(pt ->
+                        testObjects.stream().anyMatch(obj -> obj.getROI().contains(pt.getX(), pt.getY()))
+                ).toList();
+
+
+                var filteredOther = otherPoints.stream().filter(pt ->
+                        testObjects.stream().anyMatch(obj -> obj.getROI().contains(pt.getX(), pt.getY()))
+                ).toList();
+
+                // Get prediction
+                var predictedCy5 = testObjects.stream()
+                        .filter(obj -> positiveClass.equals(obj.getPathClass()))
+                        .toList();
+
+                var predictedOther = testObjects.stream()
+                        .filter(obj -> negativeClass.equals(obj.getPathClass()))
+                        .toList();
+
+                // Matched points with prediction and annotation
+                var matchedCy5 = filteredCy5.stream().filter(pt ->
+                        predictedCy5.stream().anyMatch(obj -> obj.getROI().contains(pt.getX(), pt.getY()))
+                ).count();
+
+                var matchedOther = filteredOther.stream().filter(pt ->
+                        predictedOther.stream().anyMatch(obj -> obj.getROI().contains(pt.getX(), pt.getY()))
+                ).count();
+
+                // Compute values for metrics see later
+                int gtCy5 = filteredCy5.size();
+                int gtOther = filteredOther.size();
+                int tp = (int) matchedCy5;
+                int tn = (int) matchedOther;
+                int fn = gtCy5 - tp;
+                int fp = gtOther - tn;
+
+                TP += tp;
+                TN += tn;
+                FN += fn;
+                FP += fp;
+                // verify line in console to verify the results (delete?)
+                logger.info("Image {} — TP: {}, FP: {}, FN: {}, TN: {}", entry.getImageName(), tp, fp, fn, tn);
+            }
+
+            // Computation of the metrics
+            double recall = TP / (TP + FN + 1e-10);
+            double precision = TP / (TP + FP + 1e-10);
+            double f1 = 2 * precision * recall / (precision + recall + 1e-10);
+            double cohen = 2.0 * (TP * TN - FN * FP) /
+                    ((TP + FP) * (FP + TN) + (TP + FN) * (FN + TN) + 1e-10);
+
+            // bug without this line ? (delete maybe)
+            final int TP_ = TP;
+            final int FN_ = FN;
+            final int FP_ = FP;
+            final int TN_ = TN;
+
+            final double precision_ = precision;
+            final double recall_ = recall;
+            final double f1_ = f1;
+            final double kappa_ = cohen;
+
+            Platform.runLater(() -> {
+                //
+                confusionGrid.getChildren().removeIf(node ->
+                        GridPane.getRowIndex(node) != null && GridPane.getRowIndex(node) > 0 && GridPane.getColumnIndex(node) > 0
+                );
+
+                //
+                confusionGrid.add(new Label(String.valueOf(TP_)), 1, 1);
+                confusionGrid.add(new Label(String.valueOf(FN_)), 2, 1);
+                confusionGrid.add(new Label(String.valueOf(FP_)), 1, 2);
+                confusionGrid.add(new Label(String.valueOf(TN_)), 2, 2);
+
+                //Other metrics
+                Text textPrecision = new Text("Precision:   ");
+                textPrecision.setStyle("-fx-font-weight: bold; -fx-font-style: italic;");  // Nom en gras et italique
+
+                Text textPrecisionValue = new Text(String.format("%.2f", precision_));
+                textPrecisionValue.setStyle("-fx-font-weight: bold;");  // Chiffre en gras
+
+                Text textRange = new Text("  	(Range: 0 - 1 | Good: >= 0.80)");
+                textRange.setStyle("-fx-font-weight: normal; -fx-font-style: normal;");  // Plage en texte normal
+
+                TextFlow precisionFlow = new TextFlow(textPrecision, textPrecisionValue, textRange);
+                lblPrecision.setGraphic(precisionFlow);  // Utilisation de TextFlow comme graphic
+
+
+                Text textRecall = new Text("Recall:       ");
+                textRecall.setStyle("-fx-font-weight: bold; -fx-font-style: italic;");
+                Text textRecallValue = new Text(String.format("%.2f", recall_));
+                textRecallValue.setStyle("-fx-font-weight: bold;");  // Chiffre en gras
+                Text textRecallRange = new Text("  	(Range: 0 - 1 | Good: >= 0.80)");
+                textRecallRange.setStyle("-fx-font-weight: normal; -fx-font-style: normal;");
+
+                TextFlow recallFlow = new TextFlow(textRecall, textRecallValue, textRecallRange);
+                lblRecall.setGraphic(recallFlow);
+
+                Text textF1 = new Text("F1-score:    ");
+                textF1.setStyle("-fx-font-weight: bold; -fx-font-style: italic;");
+                Text textF1Value = new Text(String.format("%.2f", f1_));
+                textF1Value.setStyle("-fx-font-weight: bold;");  // Chiffre en gras
+                Text textF1Range = new Text("  	(Range: 0 - 1 | Good: >= 0.75)");
+                textF1Range.setStyle("-fx-font-weight: normal; -fx-font-style: normal;");
+
+                TextFlow f1Flow = new TextFlow(textF1, textF1Value, textF1Range);
+                lblF1.setGraphic(f1Flow);
+
+                Text textKappa = new Text("Cohen's Kappa: ");
+                textKappa.setStyle("-fx-font-weight: bold; -fx-font-style: italic;");
+                Text textKappaValue = new Text(String.format("%.2f", kappa_));
+                textKappaValue.setStyle("-fx-font-weight: bold;");  // Chiffre en gras
+                Text textKappaRange = new Text("  	(Range: -1 to 1 | Good: >= 0.60)");
+                textKappaRange.setStyle("-fx-font-weight: normal; -fx-font-style: normal;");
+
+                TextFlow kappaFlow = new TextFlow(textKappa, textKappaValue, textKappaRange);
+                lblKappa.setGraphic(kappaFlow);
+
+
+            });
+        }
     }
 
 
@@ -1460,14 +1946,14 @@ public class BraiAnObjectClassifierCommand implements Runnable {
      * Includes checkboxes, select all/none options, and (optionally) a filter box.
      * @param <T>
      */
-    static class SelectionPane<T> {
+    static class BraiAnSelectionPane<T> {
 
         private BorderPane pane;
 
-        private TableView<SelectableItem<T>> tableFeatures;
-        private FilteredList<SelectableItem<T>> list;
+        private TableView<BraiAnSelectionPane.SelectableItem<T>> tableFeatures;
+        private FilteredList<BraiAnSelectionPane.SelectableItem<T>> list;
 
-        SelectionPane(Collection<T> items, boolean includeFilter) {
+        BraiAnSelectionPane(Collection<T> items, boolean includeFilter) {
             list = FXCollections.observableArrayList(
                     items.stream().map(i -> getSelectableItem(i)).toList()
             ).filtered(p -> true);
@@ -1481,7 +1967,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
 
         public List<T> getSelectedItems() {
             List<T> selectedFeatures = new ArrayList<>();
-            for (SelectableItem<T> feature : tableFeatures.getItems()) {
+            for (BraiAnSelectionPane.SelectableItem<T> feature : tableFeatures.getItems()) {
                 if (feature.isSelected())
                     selectedFeatures.add(feature.getItem());
             }
@@ -1490,11 +1976,11 @@ public class BraiAnObjectClassifierCommand implements Runnable {
 
 
         private BorderPane makePane(boolean includeFilter) {
-            TableColumn<SelectableItem<T>, String> columnName = new TableColumn<>("Name");
+            TableColumn<BraiAnSelectionPane.SelectableItem<T>, String> columnName = new TableColumn<>("Name");
             columnName.setCellValueFactory(new PropertyValueFactory<>("item"));
             columnName.setEditable(false);
 
-            TableColumn<SelectableItem<T>, Boolean> columnSelected = new TableColumn<>("Selected");
+            TableColumn<BraiAnSelectionPane.SelectableItem<T>, Boolean> columnSelected = new TableColumn<>("Selected");
             columnSelected.setCellValueFactory(new PropertyValueFactory<>("selected"));
             columnSelected.setCellFactory(column -> new CheckBoxTableCell<>());
             columnSelected.setEditable(true);
@@ -1510,13 +1996,13 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             var menu = new ContextMenu();
             var itemSelect = new MenuItem("Select");
             itemSelect.setOnAction(e -> {
-                for (SelectableItem<T> feature : tableFeatures.getSelectionModel().getSelectedItems())
+                for (BraiAnSelectionPane.SelectableItem<T> feature : tableFeatures.getSelectionModel().getSelectedItems())
                     feature.setSelected(true);
             });
             menu.getItems().add(itemSelect);
             var itemDeselect = new MenuItem("Deselect");
             itemDeselect.setOnAction(e -> {
-                for (SelectableItem<T> feature : tableFeatures.getSelectionModel().getSelectedItems())
+                for (BraiAnSelectionPane.SelectableItem<T> feature : tableFeatures.getSelectionModel().getSelectedItems())
                     feature.setSelected(false);
             });
             menu.getItems().add(itemDeselect);
@@ -1526,13 +2012,13 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             // Button to update the features
             var btnSelectAll = new Button("Select all");
             btnSelectAll.setOnAction(e -> {
-                for (SelectableItem<T> feature : tableFeatures.getItems())
+                for (BraiAnSelectionPane.SelectableItem<T> feature : tableFeatures.getItems())
                     feature.setSelected(true);
 
             });
             var btnSelectNone = new Button("Select none");
             btnSelectNone.setOnAction(e -> {
-                for (SelectableItem<T> feature : tableFeatures.getItems())
+                for (BraiAnSelectionPane.SelectableItem<T> feature : tableFeatures.getItems())
                     feature.setSelected(false);
             });
             var panelSelectButtons = GridPaneUtils.createColumnGridControls(btnSelectAll, btnSelectNone);
@@ -1540,7 +2026,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             Pane panelButtons;
 
             if (includeFilter) {
-                var tfFilter = new PredicateTextField<SelectableItem>(s -> s.getItem().toString());
+                var tfFilter = new PredicateTextField<BraiAnSelectionPane.SelectableItem>((s) -> s.getItem().toString());
                 var tooltip = new Tooltip("Type to filter table entries (case-insensitive)");
                 Tooltip.install(tfFilter, tooltip);
                 tfFilter.setPromptText("Type to filter table entries");
@@ -1580,13 +2066,13 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             }
         }
 
-        private Map<T, SelectableItem<T>> itemPool = new HashMap<>();
+        private Map<T, BraiAnSelectionPane.SelectableItem<T>> itemPool = new HashMap<>();
 
 
-        private SelectableItem<T> getSelectableItem(final T item) {
-            SelectableItem<T> feature = itemPool.get(item);
+        private BraiAnSelectionPane.SelectableItem<T> getSelectableItem(final T item) {
+            BraiAnSelectionPane.SelectableItem<T> feature = itemPool.get(item);
             if (feature == null) {
-                feature = new SelectableItem<>(item);
+                feature = new BraiAnSelectionPane.SelectableItem<>(item);
                 itemPool.put(item, feature);
             }
             return feature;
