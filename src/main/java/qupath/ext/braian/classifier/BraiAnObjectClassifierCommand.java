@@ -1274,7 +1274,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             var comboClasses = new ComboBox<OutputClasses>();
             labelClasses.setLabelFor(comboClasses);
             comboClasses.getItems().setAll(OutputClasses.values());
-            comboClasses.getSelectionModel().select(OutputClasses.ALL);
+            comboClasses.getSelectionModel().select(OutputClasses.SELECTED);
             labelClasses.setLabelFor(comboClasses);
             outputClasses = comboClasses.getSelectionModel().selectedItemProperty();
             outputClasses.addListener(v -> invalidateClassifier());
@@ -1307,6 +1307,8 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             GridPaneUtils.addGridRow(pane, row++, 0,
                     null,
                     labelClasses, comboClasses, btnSelectClasses);
+
+
 
             /*
              * Training annotations
@@ -1543,6 +1545,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             qupath.getStage().getScene().addEventFilter(MouseEvent.MOUSE_MOVED, e -> updateLocationText(e));
 
             pane.setPadding(new Insets(5));
+
         }
 
 
@@ -1662,14 +1665,14 @@ public class BraiAnObjectClassifierCommand implements Runnable {
         private void cleanup(QuPathGUI qupath) {
             deregisterListeners(qupath);
             // Ensure we have closed any cached images
-            for (var data : trainingMap.values()) {
-                try {
-                    data.getServer().close();
-                    logger.info("test_close" );
-                } catch (Exception e) {
-                    logger.warn("Error closing server: " + e.getLocalizedMessage(), e);
-                }
-            }
+//            for (var data : trainingMap.values()) {
+//                try {
+//                    data.getServer().close();
+//                    logger.info("test_close" );
+//                } catch (Exception e) {
+//                    logger.warn("Error closing server: " + e.getLocalizedMessage(), e);
+//                }
+//            }
             trainingEntries.clear();
             trainingMap.clear();
         }
@@ -1929,6 +1932,13 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                     items.stream().map(i -> getSelectableItem(i)).toList()
             ).filtered(p -> true);
             tableFeatures = new TableView<>(list);
+            // Automatic pre-selection
+            if (tableFeatures.getItems().size() >= 1)
+                tableFeatures.getItems().get(0).setPositive(true);
+
+            if (tableFeatures.getItems().size() >= 2)
+                tableFeatures.getItems().get(1).setNegative(true);
+
             pane = makePane(includeFilter);
         }
 
@@ -1973,44 +1983,70 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             colNegative.setEditable(true);
             colNegative.setPrefWidth(90);
             colNegative.setResizable(false);
+//User cannot have 2 Positive class
+            colPositive.setCellFactory(column -> new TableCell<>() {
+                private final CheckBox checkBox = new CheckBox();
 
-            // Exclusivité pour colonne Positive
-            colPositive.setCellFactory(column -> new CheckBoxTableCell<>() {
-                @Override
-                public void updateItem(Boolean item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
-                        SelectableItem<T> currentItem = getTableRow().getItem();
-                        this.selectedProperty().addListener((obs, oldVal, newVal) -> {
-                            if (newVal) {
-                                for (SelectableItem<T> other : tableFeatures.getItems()) {
-                                    if (other != currentItem)
-                                        other.setPositive(false);
-                                }
+                {
+                    checkBox.setOnAction(e -> {
+                        var currentItem = getTableView().getItems().get(getIndex());
+                        boolean newValue = checkBox.isSelected();
+                        currentItem.setPositive(newValue);
+                        if (newValue) {
+                            for (var other : getTableView().getItems()) {
+                                if (other != currentItem)
+                                    other.setPositive(false);
                             }
-                        });
+                            getTableView().refresh(); // important pour mettre à jour l'affichage
+                        }
+                    });
+                }
+
+                @Override
+                protected void updateItem(Boolean item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || getIndex() >= getTableView().getItems().size()) {
+                        setGraphic(null);
+                    } else {
+                        var currentItem = getTableView().getItems().get(getIndex());
+                        checkBox.setSelected(currentItem.isPositive());
+                        setGraphic(checkBox);
                     }
                 }
             });
 
-            // Exclusivité pour colonne Negative
-            colNegative.setCellFactory(column -> new CheckBoxTableCell<>() {
-                @Override
-                public void updateItem(Boolean item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
-                        SelectableItem<T> currentItem = getTableRow().getItem();
-                        this.selectedProperty().addListener((obs, oldVal, newVal) -> {
-                            if (newVal) {
-                                for (SelectableItem<T> other : tableFeatures.getItems()) {
-                                    if (other != currentItem)
-                                        other.setNegative(false);
-                                }
+            // User canot have 2 negative class
+            colNegative.setCellFactory(column -> new TableCell<>() {
+                private final CheckBox checkBox = new CheckBox();
+
+                {
+                    checkBox.setOnAction(e -> {
+                        var currentItem = getTableView().getItems().get(getIndex());
+                        boolean newValue = checkBox.isSelected();
+                        currentItem.setNegative(newValue);
+                        if (newValue) {
+                            for (var other : getTableView().getItems()) {
+                                if (other != currentItem)
+                                    other.setNegative(false);
                             }
-                        });
+                            getTableView().refresh(); // important pour mise à jour visuelle
+                        }
+                    });
+                }
+
+                @Override
+                protected void updateItem(Boolean item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || getIndex() >= getTableView().getItems().size()) {
+                        setGraphic(null);
+                    } else {
+                        var currentItem = getTableView().getItems().get(getIndex());
+                        checkBox.setSelected(currentItem.isNegative());
+                        setGraphic(checkBox);
                     }
                 }
             });
+
 
             tableFeatures.getColumns().add(columnName);
             tableFeatures.getColumns().add(columnSelected);
