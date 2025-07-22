@@ -715,10 +715,10 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                     var trainList = allObjects.subList(0, splitIndex);
                     var testList = allObjects.subList(splitIndex, allObjects.size());
                     for (PathObject obj : trainList) {
-                        obj.getMeasurementList().put("SetType", 1.0);
+                        obj.getMeasurementList().put("TrainingSet", 1.0);
                     }
                     for (PathObject obj : testList) {
-                        obj.getMeasurementList().put("SetType", 0.0);
+                        obj.getMeasurementList().put("TrainingSet", 0.0);
                     }
 
                     var trainSet = trainMap.computeIfAbsent(pathClass, p -> new HashSet<>());
@@ -1179,8 +1179,8 @@ public class BraiAnObjectClassifierCommand implements Runnable {
 
         private void initialize() {
 
-            pane = new GridPane();
-            int row = 0;
+             pane = new GridPane();
+             int row = 0;
 
             /*
              * Input object type
@@ -1198,9 +1198,9 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             comboObjects.getSelectionModel().select(PathObjectFilter.DETECTIONS_ALL);
             objectFilter.addListener((v, o, n) -> invalidateClassifier());
 
-            GridPaneUtils.addGridRow(pane, row++, 0,
-                    "Choose object type to classify (default is all detections)",
-                    labelObjects, comboObjects, comboObjects);
+//            GridPaneUtils.addGridRow(pane, row++, 0,
+//                    "Choose object type to classify (default is all detections)",
+//                    labelObjects, comboObjects, comboObjects);
 
             /*
              * Classifier type
@@ -1396,34 +1396,31 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             labelCursor.setTooltip(new Tooltip("Prediction for current cursor location"));
             pane.add(labelCursor, 0, row++, pane.getColumnCount(), 1);
 
-            // Classes for evaluation
-            Button btnChooseClasses = new Button("Classes for evaluation");
-            btnChooseClasses.setOnAction(e -> showClassSelectionDialog());
-            pane.add(btnChooseClasses, 0, row++, 2, 1);
+
 
 // Bouton for evaluation
             var btnEvaluateTest = new Button("Evaluate Test Set");
             btnEvaluateTest.setMaxWidth(Double.MAX_VALUE);
-            btnEvaluateTest.setTooltip(new Tooltip("Évalue les prédictions du classifieur sur les objets test (SetType = 0.0)"));
+            btnEvaluateTest.setTooltip(new Tooltip("Evaluation of the classifier on test set"));
 
             btnEvaluateTest.setOnAction(e -> {
                 new Thread(() -> {
-                    // Récupérer le classifieur actuel s’il est prêt
+
                     if (classifierTask == null) {
-                        logger.warn("Classifier non encore entraîné !");
+                        logger.warn("The Classifier is not Train !");
                         return;
                     }
 
                     ObjectClassifier<BufferedImage> classifier;
                     try {
-                        classifier = classifierTask.get(); // attendre que le training soit fini
+                        classifier = classifierTask.get();
                     } catch (Exception ex) {
-                        logger.error("Erreur récupération classifieur", ex);
+                        logger.error("Error to get the classifier", ex);
                         return;
                     }
 
                     if (classifier == null) {
-                        logger.warn("Classifieur nul, impossible de classifier les images");
+                        logger.warn("Classifier is null");
                         return;
                     }
 
@@ -1536,9 +1533,9 @@ public class BraiAnObjectClassifierCommand implements Runnable {
 //			pane.add(btnSave, 0, row++, pane.getColumnCount(), 1);
 
 
-            GridPaneUtils.setMaxWidth(Double.MAX_VALUE, comboTraining, comboObjects, comboClassifier, comboFeatures, comboClasses, panePredict);
-            GridPaneUtils.setHGrowPriority(Priority.ALWAYS, comboTraining, comboObjects, comboClassifier, comboFeatures, comboClasses, panePredict);
-            GridPaneUtils.setFillWidth(Boolean.TRUE, comboTraining, comboObjects, comboClassifier, comboClasses, panePredict);
+            GridPaneUtils.setMaxWidth(Double.MAX_VALUE, comboTraining, comboClassifier, comboFeatures, comboClasses, panePredict);
+            GridPaneUtils.setHGrowPriority(Priority.ALWAYS, comboTraining, comboClassifier, comboFeatures, comboClasses, panePredict);
+            GridPaneUtils.setFillWidth(Boolean.TRUE, comboTraining, comboClassifier, comboClasses, panePredict);
 
             pane.setHgap(5);
             pane.setVgap(6);
@@ -1556,7 +1553,8 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                 return false;
             }
 
-            var featuresPane = new BraiAnSelectionPane<>(measurements, true);
+            var featuresPane = new BraiAnSelectionPane<>(measurements, true, false);
+
             featuresPane.selectItems(selectedMeasurements);
 
             if (Dialogs.builder()
@@ -1579,8 +1577,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                 return false;
             }
             var pathClasses = annotations.stream().map(p -> p.getPathClass()).collect(Collectors.toCollection(TreeSet::new));
-            var classesPane = new BraiAnSelectionPane<>(pathClasses, true);
-            classesPane.selectItems(selectedClasses);
+            var classesPane = new BraiAnSelectionPane<PathClass>(pathClasses, true, true);            classesPane.selectItems(selectedClasses);
 
             if (Dialogs.builder()
                     .title("Select classes")
@@ -1590,8 +1587,48 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                     .orElse(ButtonType.CANCEL) != ButtonType.APPLY)
                 return false;
 
+
             selectedClasses.clear();
-            selectedClasses.addAll(classesPane.getSelectedItems());
+            positiveClass = null;
+            negativeClass = null;
+
+            int positiveCount = 0;
+            int negativeCount = 0;
+
+            for (var item : classesPane.getTableItems()) {
+                PathClass value = item.getItem();
+
+
+                if (item.isSelected())
+                    selectedClasses.add((PathClass) value);
+
+                if (item.isPositive()) {
+                    positiveClass = (PathClass) value;
+                    positiveCount++;
+                }
+
+                if (item.isNegative()) {
+                    negativeClass = (PathClass) value;
+                    negativeCount++;
+                }
+            }
+
+// === Vérifications de robustesse ===
+            if (positiveCount != 1 || negativeCount != 1) {
+                Dialogs.showErrorMessage("Invalid selection", "Please select exactly ONE positive class and ONE negative class.");
+                return false;
+            }
+
+            if (positiveClass.equals(negativeClass)) {
+                Dialogs.showErrorMessage("Invalid selection", "Positive and negative classes must be DIFFERENT.");
+                return false;
+            }
+
+            if (selectedClasses.isEmpty()) {
+                Dialogs.showErrorMessage("Invalid selection", "You must select at least ONE class for training.");
+                return false;
+            }
+
             return true;
         }
 
@@ -1628,6 +1665,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             for (var data : trainingMap.values()) {
                 try {
                     data.getServer().close();
+                    logger.info("test_close" );
                 } catch (Exception e) {
                     logger.warn("Error closing server: " + e.getLocalizedMessage(), e);
                 }
@@ -1667,75 +1705,6 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                     return;
             }
             invalidateClassifier();
-        }
-
-
-
-
-
-        //function to choose classes for the evaluation (binary task prediction)
-        private void showClassSelectionDialog() {
-            //
-            Set<PathClass> availableClasses = new HashSet<>();
-
-            // read first image
-            var project = qupath.getProject();
-            if (project == null) {
-                logger.error("Aucun projet trouvé !");
-                return;
-            }
-
-            try {
-                //
-                var firstImageData = project.getImageList().get(0).readImageData();  // On lit les données de la première image
-
-                // get classes
-                for (PathObject obj : firstImageData.getHierarchy().getFlattenedObjectList(null)) {
-                    PathClass pc = obj.getPathClass();
-                    if (pc != null) {
-                        availableClasses.add(pc);  // Ajouter la classe à l'ensemble
-                    }
-                }
-            } catch (IOException e) {
-                logger.error("Erreur lors de la lecture de l'image", e);
-                return;
-            }
-
-
-            List<PathClass> classList = availableClasses.stream()
-                    .sorted(Comparator.comparing(PathClass::getName))
-                    .toList();
-
-            // create positive and negative classes for the following test
-            ComboBox<PathClass> comboPositive = new ComboBox<>(FXCollections.observableArrayList(classList));
-            ComboBox<PathClass> comboNegative = new ComboBox<>(FXCollections.observableArrayList(classList));
-            comboPositive.setValue(positiveClass);
-            comboNegative.setValue(negativeClass);
-
-
-            GridPane grid = new GridPane();
-            grid.setHgap(10);
-            grid.setVgap(10);
-            grid.setPadding(new Insets(20, 150, 10, 10));
-
-            grid.add(new Label("Classe positive (TP) :"), 0, 0);
-            grid.add(comboPositive, 1, 0);
-            grid.add(new Label("Classe négative (TN) :"), 0, 1);
-            grid.add(comboNegative, 1, 1);
-
-
-            Dialog<ButtonType> dialog = new Dialog<>();
-            dialog.setTitle("Choose evaluation classes");
-            dialog.getDialogPane().setContent(grid);
-            dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
-
-            Optional<ButtonType> result = dialog.showAndWait();
-            if (result.isPresent() && result.get() == ButtonType.OK) {
-                // update
-                positiveClass = comboPositive.getValue();
-                negativeClass = comboNegative.getValue();
-            }
         }
 
         private void classifyAllProjectImages(ObjectClassifier<BufferedImage> classifier) {
@@ -1786,9 +1755,9 @@ public class BraiAnObjectClassifierCommand implements Runnable {
 
                 var hierarchy = imageData.getHierarchy();
 
-                // Test object = object with settype = 0
+                // Test object = object with TrainingSet = 0
                 var testObjects = hierarchy.getDetectionObjects().stream()
-                        .filter(obj -> obj.getMeasurementList().get("SetType") == 0.0)
+                        .filter(obj -> obj.getMeasurementList().get("TrainingSet") == 0.0)
                         .toList();
 
 
@@ -1951,8 +1920,11 @@ public class BraiAnObjectClassifierCommand implements Runnable {
 
         private TableView<BraiAnSelectionPane.SelectableItem<T>> tableFeatures;
         private FilteredList<BraiAnSelectionPane.SelectableItem<T>> list;
+        private final boolean includeClassSelectionColumns;
 
-        BraiAnSelectionPane(Collection<T> items, boolean includeFilter) {
+
+        BraiAnSelectionPane(Collection<T> items, boolean includeFilter, boolean includeClassSelectionColumns) {
+            this.includeClassSelectionColumns = includeClassSelectionColumns;
             list = FXCollections.observableArrayList(
                     items.stream().map(i -> getSelectableItem(i)).toList()
             ).filtered(p -> true);
@@ -1978,17 +1950,75 @@ public class BraiAnObjectClassifierCommand implements Runnable {
             TableColumn<BraiAnSelectionPane.SelectableItem<T>, String> columnName = new TableColumn<>("Name");
             columnName.setCellValueFactory(new PropertyValueFactory<>("item"));
             columnName.setEditable(false);
+            columnName.setPrefWidth(200);
+            columnName.setResizable(false);
 
             TableColumn<BraiAnSelectionPane.SelectableItem<T>, Boolean> columnSelected = new TableColumn<>("Selected");
             columnSelected.setCellValueFactory(new PropertyValueFactory<>("selected"));
-            columnSelected.setCellFactory(column -> new CheckBoxTableCell<>());
+            columnSelected.setCellFactory(CheckBoxTableCell.forTableColumn(columnSelected));
             columnSelected.setEditable(true);
+            columnSelected.setPrefWidth(80);
             columnSelected.setResizable(false);
 
-            columnName.prefWidthProperty().bind(tableFeatures.widthProperty().subtract(columnSelected.widthProperty()));
+            TableColumn<BraiAnSelectionPane.SelectableItem<T>, Boolean> colPositive = new TableColumn<>("Positive Class");
+            colPositive.setCellValueFactory(cell -> cell.getValue().positiveProperty());
+            colPositive.setCellFactory(column -> new CheckBoxTableCell<>());
+            colPositive.setEditable(true);
+            colPositive.setPrefWidth(90);
+            colPositive.setResizable(false);
+
+            TableColumn<BraiAnSelectionPane.SelectableItem<T>, Boolean> colNegative = new TableColumn<>("Negative Class");
+            colNegative.setCellValueFactory(cell -> cell.getValue().negativeProperty());
+            colNegative.setCellFactory(column -> new CheckBoxTableCell<>());
+            colNegative.setEditable(true);
+            colNegative.setPrefWidth(90);
+            colNegative.setResizable(false);
+
+            // Exclusivité pour colonne Positive
+            colPositive.setCellFactory(column -> new CheckBoxTableCell<>() {
+                @Override
+                public void updateItem(Boolean item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
+                        SelectableItem<T> currentItem = getTableRow().getItem();
+                        this.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                            if (newVal) {
+                                for (SelectableItem<T> other : tableFeatures.getItems()) {
+                                    if (other != currentItem)
+                                        other.setPositive(false);
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+
+            // Exclusivité pour colonne Negative
+            colNegative.setCellFactory(column -> new CheckBoxTableCell<>() {
+                @Override
+                public void updateItem(Boolean item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
+                        SelectableItem<T> currentItem = getTableRow().getItem();
+                        this.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                            if (newVal) {
+                                for (SelectableItem<T> other : tableFeatures.getItems()) {
+                                    if (other != currentItem)
+                                        other.setNegative(false);
+                                }
+                            }
+                        });
+                    }
+                }
+            });
 
             tableFeatures.getColumns().add(columnName);
             tableFeatures.getColumns().add(columnSelected);
+
+            if (includeClassSelectionColumns) {
+                tableFeatures.getColumns().add(colPositive);
+                tableFeatures.getColumns().add(colNegative);
+            }
             tableFeatures.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
             tableFeatures.setEditable(true);
 
@@ -2005,21 +2035,19 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                     feature.setSelected(false);
             });
             menu.getItems().add(itemDeselect);
-
             tableFeatures.setContextMenu(menu);
 
-            // Button to update the features
             var btnSelectAll = new Button("Select all");
             btnSelectAll.setOnAction(e -> {
                 for (BraiAnSelectionPane.SelectableItem<T> feature : tableFeatures.getItems())
                     feature.setSelected(true);
-
             });
             var btnSelectNone = new Button("Select none");
             btnSelectNone.setOnAction(e -> {
                 for (BraiAnSelectionPane.SelectableItem<T> feature : tableFeatures.getItems())
                     feature.setSelected(false);
             });
+
             var panelSelectButtons = GridPaneUtils.createColumnGridControls(btnSelectAll, btnSelectNone);
 
             Pane panelButtons;
@@ -2042,20 +2070,17 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                 paneFilter.setHgap(5);
                 paneFilter.setPadding(new Insets(5, 0, 5, 0));
 
-                panelButtons = GridPaneUtils.createRowGrid(
-                        panelSelectButtons,
-                        paneFilter
-                );
-            } else
+                panelButtons = GridPaneUtils.createRowGrid(panelSelectButtons, paneFilter);
+            } else {
                 panelButtons = panelSelectButtons;
+            }
 
             var panelFeatures = new BorderPane();
             panelFeatures.setCenter(tableFeatures);
             panelFeatures.setBottom(panelButtons);
-
-
             return panelFeatures;
         }
+
 
         void selectItems(Collection<T> toSelect) {
             for (var item : toSelect) {
@@ -2082,6 +2107,8 @@ public class BraiAnObjectClassifierCommand implements Runnable {
 
             private ObjectProperty<T> item = new SimpleObjectProperty<>();
             private BooleanProperty selected = new SimpleBooleanProperty(false);
+            private BooleanProperty positive = new SimpleBooleanProperty(false);
+            private BooleanProperty negative = new SimpleBooleanProperty(false);
 
             public SelectableItem(final T item) {
                 this.item.set(item);
@@ -2107,7 +2134,36 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                 return item.get();
             }
 
+            public BooleanProperty positiveProperty() {
+                return positive;
+            }
+
+            public boolean isPositive() {
+                return positive.get();
+            }
+
+            public void setPositive(boolean value) {
+                this.positive.set(value);
+            }
+
+            public BooleanProperty negativeProperty() {
+                return negative;
+            }
+
+            public boolean isNegative() {
+                return negative.get();
+            }
+
+            public void setNegative(boolean value) {
+                this.negative.set(value);
+            }
+
+
         }
+        public List<SelectableItem<T>> getTableItems() {
+            return tableFeatures.getItems();
+        }
+
 
     }
 
