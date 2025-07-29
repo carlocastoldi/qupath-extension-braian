@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoundingBoxHierarchy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian</a> &gt; <span class="el_source">BoundingBoxHierarchy.java</span></div><h1>BoundingBoxHierarchy.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian;
+
+import org.locationtech.jts.geom.Geometry;
+import qupath.lib.objects.PathObject;
+import qupath.lib.roi.interfaces.ROI;
+
+import java.awt.*;
+import java.awt.geom.Rectangle2D;
+import java.util.*;
+import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+
+interface BoundingBox {
+    Rectangle2D getBox();
+    int getDepth();
+    Stream&lt;PathObject&gt; toStream();
+    Optional&lt;PathObject&gt; getOverlappingObjectIfPresent(PathObject object);
+    boolean contains(PathObject object);
+}
+
+class BVHNode implements BoundingBox {
+    private final PathObject po;
+    private final double centroidX;
+    private final double centroidY;
+    private final Rectangle2D.Double bbox;
+
+<span class="fc" id="L32">    public BVHNode(PathObject po) {</span>
+<span class="fc" id="L33">        this.po = po;</span>
+<span class="fc" id="L34">        ROI roi = po.getROI();</span>
+<span class="fc" id="L35">        centroidX = roi.getCentroidX();</span>
+<span class="fc" id="L36">        centroidY = roi.getCentroidY();</span>
+<span class="fc" id="L37">        this.bbox = new Rectangle2D.Double(roi.getBoundsX(), roi.getBoundsY(), roi.getBoundsWidth(), roi.getBoundsHeight());</span>
+<span class="fc" id="L38">    }</span>
+
+    @Override
+    public Stream&lt;PathObject&gt; toStream() {
+<span class="fc" id="L42">        return Stream.of(this.po);</span>
+    }
+
+    @Override
+    public Optional&lt;PathObject&gt; getOverlappingObjectIfPresent(PathObject object) {
+        // if ROI.contains() results in being buggy, in the future we could rely on:
+        // ROI.getGeometry().covers(c) || ROI.getGeometry().intersects(c)
+<span class="fc" id="L49">        ROI roiObject = object.getROI();</span>
+<span class="fc" id="L50">        double x = roiObject.getBoundsX();</span>
+<span class="fc" id="L51">        double y = roiObject.getBoundsY();</span>
+<span class="fc bfc" id="L52" title="All 4 branches covered.">        if (roiObject.isPoint() || roiObject.isEmpty())</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">            if (x == centroidX &amp;&amp; y == centroidY)</span>
+<span class="fc" id="L54">                return Optional.of(this.po);</span>
+            else
+<span class="nc" id="L56">                return Optional.empty();</span>
+<span class="fc" id="L57">        double w = roiObject.getBoundsWidth();</span>
+<span class="fc" id="L58">        double h = roiObject.getBoundsHeight();</span>
+<span class="fc bfc" id="L59" title="All 4 branches covered.">        if(!this.bbox.intersects(x, y, w, h) &amp;&amp; !this.bbox.isEmpty())</span>
+<span class="fc" id="L60">            return Optional.empty();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if(roiObject.contains(centroidX, centroidY))</span>
+<span class="fc" id="L62">            return Optional.of(this.po);</span>
+
+<span class="fc" id="L64">        return Optional.empty();</span>
+    }
+
+    @Override
+    public boolean contains(PathObject other) {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        return this.po == other;</span>
+    }
+
+    @Override
+    public Rectangle2D getBox() {
+<span class="nc" id="L74">        return this.bbox;</span>
+    }
+
+    @Override
+    public int getDepth() {
+<span class="fc" id="L79">        return 0;</span>
+    }
+}
+
+/**
+ * The class &lt;code&gt;BoundingBoxHierarchy&lt;/code&gt; is data structure that helps in searching for specific
+ * {@link PathObject} based on their shape and in logarithmic time to the total number
+ * of object stored. The cost is paid at construction time, but it should be worth it if the look-up
+ * operation is performed at least two times.
+ * &lt;p&gt;
+ * &lt;code&gt;BoundingBoxHierarchy&lt;/code&gt; was build targeting images with lots (1000+) of
+ * {@link qupath.lib.objects.PathDetectionObject}, but works with all {@link PathObject}.
+ * &lt;p&gt;
+ * For more information check &lt;a href=&quot;https://en.wikipedia.org/wiki/Bounding_volume_hierarchy&quot;&gt;Bounding volume hierarchy&lt;/a&gt;.
+ */
+<span class="fc" id="L94">public class BoundingBoxHierarchy implements BoundingBox {</span>
+    private final Rectangle2D.Double bbox;
+    private final Collection&lt;BoundingBox&gt; children;
+
+    /**
+     * Builds a top-down &lt;a href=&quot;https://en.wikipedia.org/wiki/Bounding_volume_hierarchy&quot;&gt;BVH&lt;/a&gt; of maximum 6 levels
+     * of hierarchy.
+     * @param objects the given objects to insert into the hierarchy
+     */
+    public BoundingBoxHierarchy(Collection&lt;? extends PathObject&gt; objects) {
+<span class="fc" id="L104">        this(objects, 6);</span>
+<span class="fc" id="L105">    }</span>
+
+    /**
+     * Builds a top-down &lt;a href=&quot;https://en.wikipedia.org/wiki/Bounding_volume_hierarchy&quot;&gt;BVH&lt;/a&gt;
+     * @param objects the given objects to insert into the hierarchy
+     * @param maxDepth the maximum depth that that hierarchy can have.
+     *                 Below maxDepth, the recursive structure stops and lists all the remaining objects
+     */
+<span class="fc" id="L113">    public BoundingBoxHierarchy(Collection&lt;? extends PathObject&gt; objects, int maxDepth) {</span>
+        // top-down construction
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (maxDepth &lt; 1)</span>
+<span class="fc" id="L116">            throw new IllegalArgumentException(&quot;maxDepth must be &gt;1. Instead got maxDepth=&quot;+maxDepth);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (objects.isEmpty()) {</span>
+<span class="fc" id="L118">            this.bbox = new Rectangle2D.Double();</span>
+<span class="fc" id="L119">            this.children = Arrays.asList();</span>
+<span class="fc" id="L120">            return;</span>
+        }
+<span class="fc bfc" id="L122" title="All 6 branches covered.">        if (objects.stream().anyMatch(o -&gt; {ROI roi = o.getROI(); return roi.isPoint() &amp;&amp; roi.getNumPoints() &gt; 1;}))</span>
+<span class="fc" id="L123">            throw new IllegalArgumentException(&quot;BoundingBoxHierarchy cannot handle PointsROI objects with multiple points&quot;);</span>
+<span class="fc" id="L124">        double minX = objects.stream().map(object -&gt; object.getROI().getBoundsX()).min(Double::compare).get();</span>
+<span class="fc" id="L125">        double minY = objects.stream().map(object -&gt; object.getROI().getBoundsY()).min(Double::compare).get();</span>
+<span class="fc" id="L126">        double maxX = objects.stream().map(object -&gt; object.getROI().getBoundsX() + object.getROI().getBoundsWidth()).max(Double::compare).get();</span>
+<span class="fc" id="L127">        double maxY = objects.stream().map(object -&gt; object.getROI().getBoundsY() + object.getROI().getBoundsHeight()).max(Double::compare).get();</span>
+<span class="fc" id="L128">        this.bbox = new Rectangle2D.Double(minX, minY, maxX - minX, maxY - minY);</span>
+<span class="fc bfc" id="L129" title="All 4 branches covered.">        if (maxDepth == 1 || this.bbox.isEmpty())</span>
+<span class="fc" id="L130">            this.children = objects.stream().map(object -&gt; (BoundingBox) new BVHNode(object)).toList();</span>
+        else
+<span class="fc" id="L132">            this.children = splitSpace() // split space in equally sized squares</span>
+<span class="fc" id="L133">                    .map(subArea -&gt; findObjectsInside(objects, subArea)) // uses java.awt.Shape definition of insideness.</span>
+                    // This ensures that an object in objects is not inside multiple areas
+<span class="fc" id="L135">                    .filter(Predicate.not(Collection::isEmpty))</span>
+<span class="fc" id="L136">                    .map(insideSubArea -&gt; createChildBoundingBox(insideSubArea, maxDepth))</span>
+<span class="fc" id="L137">                    .toList();</span>
+<span class="fc" id="L138">    }</span>
+
+    private Stream&lt;Rectangle2D&gt; splitSpace() {
+        // divides the space in 4 squares
+<span class="fc" id="L142">        double length = Math.max(this.bbox.getWidth(), this.bbox.getHeight()) / 2;</span>
+<span class="fc" id="L143">        double minX = this.bbox.getX();</span>
+<span class="fc" id="L144">        double minY = this.bbox.getY();</span>
+<span class="fc" id="L145">        double[][] asd = {{minX, minY}, {minX + length, minY}, {minX, minY + length}, {minX + length, minY + length}};</span>
+<span class="fc" id="L146">        return Arrays.stream(asd).map(pos -&gt; new Rectangle2D.Double(pos[0], pos[1], length, length));</span>
+    }
+
+    private List&lt;? extends PathObject&gt; findObjectsInside(Collection&lt;? extends PathObject&gt; objects, Shape area) {
+<span class="fc" id="L150">        return objects.stream()</span>
+<span class="fc" id="L151">                .filter(o -&gt; area.contains(o.getROI().getCentroidX(), o.getROI().getCentroidY()))</span>
+<span class="fc" id="L152">                .toList();</span>
+    }
+
+    private BoundingBox createChildBoundingBox(List&lt;? extends PathObject&gt; objectsInside, int nLevels) {
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        assert !objectsInside.isEmpty();</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (objectsInside.size() == 1)</span>
+<span class="fc" id="L158">            return new BVHNode(objectsInside.get(0));</span>
+        else
+<span class="fc" id="L160">            return new BoundingBoxHierarchy(objectsInside, nLevels - 1);</span>
+    }
+
+    /**
+     * Retrieves the object in the hierarchy whose centroid:
+     * &lt;ul&gt;
+     *   &lt;li&gt;is inside the specified &lt;code&gt;object&lt;/code&gt;&lt;/li&gt;
+     * 	 &lt;li&gt;is the closest to the specified &lt;code&gt;object&lt;/code&gt;'s centroid&lt;/li&gt;
+     * &lt;/ul&gt;
+     * It follows {@link qupath.lib.roi.interfaces.ROI#contains(double, double)} definition of &lt;i&gt;insideness&lt;/i&gt; for
+     * determining the overlap. Which, in turn, relies on {@link org.locationtech.jts.geom.Geometry#contains(Geometry)}
+     * and &lt;a href=&quot;https://en.wikipedia.org/wiki/DE-9IM&quot;&gt;DE-9IM&lt;/a&gt; intersection matrix.
+     * @param object the object to search the overlap for
+     * @return the closest PathObject in the hierarchy, or null if there is no overlap
+     * @see qupath.lib.roi.interfaces.ROI#getCentroidX() ROI.getCentroidX()
+     * @see qupath.lib.roi.interfaces.ROI#getCentroidY() ROI.getCentroidY()
+     * @see BoundingBoxHierarchy#getOverlappingObjectIfPresent(PathObject)
+     */
+    public PathObject getOverlappingObject(PathObject object) {
+        // TODO: rename to getObjectOverlappingCentroid
+<span class="fc" id="L180">        return this.getOverlappingObjectIfPresent(object).orElse(null);</span>
+    }
+
+    @Override
+    public boolean contains(PathObject object) {
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if(this.isEmpty()) // if the BBH is empty</span>
+<span class="fc" id="L186">            return false;</span>
+<span class="fc" id="L187">        ROI objectRoi = object.getROI();</span>
+<span class="fc bfc" id="L188" title="All 4 branches covered.">        if (!objectRoi.isPoint() &amp;&amp; !objectRoi.isEmpty()) {</span>
+<span class="fc" id="L189">            double poX = objectRoi.getBoundsX();</span>
+<span class="fc" id="L190">            double poY = objectRoi.getBoundsY();</span>
+<span class="fc" id="L191">            double poW = objectRoi.getBoundsWidth();</span>
+<span class="fc" id="L192">            double poH = objectRoi.getBoundsHeight();</span>
+<span class="fc bfc" id="L193" title="All 4 branches covered.">            if (!this.bbox.intersects(poX, poY, poW, poH) &amp;&amp; !this.bbox.isEmpty())</span>
+<span class="fc" id="L194">                return false;</span>
+        }
+<span class="fc" id="L196">        return this.children.stream().anyMatch(bvh -&gt; bvh.contains(object));</span>
+    }
+
+    /**
+     * Retrieves the object in the hierarchy whose centroid:
+     * &lt;ul&gt;
+     *   &lt;li&gt;is inside the specified &lt;code&gt;object&lt;/code&gt;&lt;/li&gt;
+     * 	 &lt;li&gt;is the closest to the specified &lt;code&gt;object&lt;/code&gt;'s centroid&lt;/li&gt;
+     * &lt;/ul&gt;
+     * It follows {@link qupath.lib.roi.interfaces.ROI#contains(double, double)} definition of &lt;i&gt;insideness&lt;/i&gt; for
+     * determining the overlap. Which, in turn, relies on {@link org.locationtech.jts.geom.Geometry#contains(Geometry)}
+     * and &lt;a href=&quot;https://en.wikipedia.org/wiki/DE-9IM&quot;&gt;DE-9IM&lt;/a&gt; intersection matrix.
+     * @param object the object to search the overlap for
+     * @return the closest PathObject in the hierarchy as an {@link java.util.Optional Optional}
+     * @see qupath.lib.roi.interfaces.ROI#getCentroidX() ROI.getCentroidX()
+     * @see qupath.lib.roi.interfaces.ROI#getCentroidY() ROI.getCentroidY()
+     * @see BoundingBoxHierarchy#getOverlappingObject(PathObject)
+     */
+    @Override
+    public Optional&lt;PathObject&gt; getOverlappingObjectIfPresent(PathObject object) {
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if(this.isEmpty()) // if the BBH is empty</span>
+<span class="fc" id="L217">            return Optional.empty();</span>
+<span class="fc" id="L218">        ROI objectRoi = object.getROI();</span>
+<span class="fc bfc" id="L219" title="All 4 branches covered.">        if (!objectRoi.isPoint() &amp;&amp; !objectRoi.isEmpty()) {</span>
+<span class="fc" id="L220">            double poX = objectRoi.getBoundsX();</span>
+<span class="fc" id="L221">            double poY = objectRoi.getBoundsY();</span>
+<span class="fc" id="L222">            double poW = objectRoi.getBoundsWidth();</span>
+<span class="fc" id="L223">            double poH = objectRoi.getBoundsHeight();</span>
+<span class="fc bfc" id="L224" title="All 4 branches covered.">            if (!this.bbox.intersects(poX, poY, poW, poH) &amp;&amp; !this.bbox.isEmpty())</span>
+<span class="fc" id="L225">                return Optional.empty();</span>
+        }
+<span class="fc" id="L227">        List&lt;PathObject&gt; overlaps = this.children.stream()</span>
+<span class="fc" id="L228">                .map(bvh -&gt; bvh.getOverlappingObjectIfPresent(object))</span>
+<span class="fc" id="L229">                .flatMap(Optional::stream)</span>
+<span class="fc" id="L230">                .toList();</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (overlaps.size() &lt; 2)</span>
+<span class="fc" id="L232">            return overlaps.stream().findFirst();</span>
+        // there are more than one object overlapping
+<span class="fc" id="L234">        return Optional.of(getClosestOverlap(overlaps, object));</span>
+    }
+
+    /**
+     * @return true if there are no {@link PathObject} inside
+     */
+    public boolean isEmpty() {
+        // if the bbox is empty, it could still mean that there is one object with PointsROI or something similar
+<span class="fc" id="L242">        return this.children.isEmpty();</span>
+    }
+
+    private PathObject getClosestOverlap(List&lt;PathObject&gt; overlaps, PathObject object) {
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">        assert overlaps.size() &gt;= 2;</span>
+<span class="fc" id="L247">        List&lt;Double&gt; distances =  overlaps.stream()</span>
+<span class="fc" id="L248">                .map(overlap -&gt; {</span>
+<span class="fc" id="L249">                    double x1 = object.getROI().getCentroidX();</span>
+<span class="fc" id="L250">                    double y1 = object.getROI().getCentroidY();</span>
+<span class="fc" id="L251">                    double x2 = overlap.getROI().getCentroidX();</span>
+<span class="fc" id="L252">                    double y2 = overlap.getROI().getCentroidY();</span>
+<span class="fc" id="L253">                    return Math.hypot(x1-x2, y1-y2);</span>
+                })
+<span class="fc" id="L255">                .toList();</span>
+<span class="fc" id="L256">        int argMin = distances.indexOf(distances.stream().min(Double::compare).get()); // can't fail on get() as the stream is at least 2-elements long</span>
+<span class="fc" id="L257">        return overlaps.get(argMin);</span>
+    }
+
+    /**
+     * Visits each element of the hierarchy and outputs all the objects contained as {@link java.util.stream.Stream}.
+     * @return the stream of all saved objects
+     */
+    @Override
+    public Stream&lt;PathObject&gt; toStream() {
+<span class="fc" id="L266">        return this.children.stream().flatMap(BoundingBox::toStream);</span>
+    }
+
+    /**
+     * Returns a rectangle in which all objects' ROI are inside
+     * @return the bounding box of all objects
+     */
+    @Override
+    public Rectangle2D getBox() {
+<span class="fc" id="L275">        return this.bbox;</span>
+    }
+
+    /**
+     * Compute the BoundingBoxHierarchy's maximum depth
+     * @return the maximum depth of the hierarchy. Returns -1 if the BoundingBoxHierarchy is empty.
+     */
+    @Override
+    public int getDepth() {
+<span class="fc" id="L284">        return this.children.stream()</span>
+<span class="fc" id="L285">                .map(BoundingBox::getDepth)</span>
+<span class="fc" id="L286">                .max(Integer::compare)</span>
+<span class="fc" id="L287">                .orElseGet(() -&gt; -2)+1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
