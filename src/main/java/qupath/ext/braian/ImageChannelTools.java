@@ -4,7 +4,6 @@
 
 package qupath.ext.braian;
 
-import ij.CompositeImage;
 import ij.ImagePlus;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
@@ -37,6 +36,7 @@ public class ImageChannelTools {
      * @param name name of the channel
      * @param server image server to which the channel is referring to
      */
+    @Deprecated(since = "1.1.1")
     public ImageChannelTools(String name, ImageServer<BufferedImage> server) {
         this.name = name;
         this.imageData = null;
@@ -45,7 +45,7 @@ public class ImageChannelTools {
     }
 
     /**
-     * Crates an {@link ImageChannelTools} from the given channel name and {@link ImageServer}
+     * Crates an {@link ImageChannelTools} from the given channel name and {@link ImageData}
      * @param name name of the channel
      * @param imageData data of the image to which the channel is referring to
      */
@@ -110,11 +110,11 @@ public class ImageChannelTools {
         double downsample = server.getDownsampleForResolution(Math.min(server.nResolutions()-1, resolutionLevel));
         RegionRequest request = RegionRequest.createInstance(server, downsample);
         PathImage<ImagePlus> pathImage = IJTools.convertToImagePlus(server, request);
-        ImagePlus ci = pathImage.getImage();
+        ImagePlus image = pathImage.getImage();
 
-        int ijChannel = this.nChannel+1; // ij.CompositeImage uses 1-based channels
-        ci.setC(ijChannel);
-        ImageProcessor ip = ci.getChannelProcessor();
+        int ijChannel = this.nChannel+1; // ij.ImagePlus uses 1-based channels
+        image.setC(ijChannel);
+        ImageProcessor ip = image.getChannelProcessor();
         ip = ip.duplicate();
         ip.resetRoi();
         return ip;

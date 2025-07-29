@@ -19,9 +19,8 @@ import qupath.ext.braian.config.WatershedCellDetectionConfig
 import static qupath.lib.scripting.QP.*
 
 var imageData = getCurrentImageData()
-var server = imageData.getServer()
 
-var channel = new ImageChannelTools("AF647", server)
+var channel = new ImageChannelTools("AF647", imageData)
 var thresholder = new AutoThresholdParmameters() // with default parameters
 WatershedCellDetectionConfig.findThreshold(channel, thresholder)
 thresholder.resolutionLevel = 2  // increase the resolution (lower level) from which the histogram is computed

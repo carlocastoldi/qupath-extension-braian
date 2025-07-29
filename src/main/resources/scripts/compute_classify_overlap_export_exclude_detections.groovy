@@ -37,7 +37,7 @@ var annotations = config.getAnnotationsForDetections(hierarchy)
 
 // COMPUTE CHANNEL DETECTIONS
 var allDetections = config.channelDetections.collect { detectionsConf ->
-    var channel = new ImageChannelTools(detectionsConf.name, server)
+    var channel = new ImageChannelTools(detectionsConf.name, imageData)
     try {
         new ChannelDetections(channel, annotations, detectionsConf.parameters, hierarchy)
     } catch (IllegalArgumentException ignored) {
