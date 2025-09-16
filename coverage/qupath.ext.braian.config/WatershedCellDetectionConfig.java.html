@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WatershedCellDetectionConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian.config</a> &gt; <span class="el_source">WatershedCellDetectionConfig.java</span></div><h1>WatershedCellDetectionConfig.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian.config;
+
+import qupath.ext.braian.ChannelHistogram;
+import qupath.ext.braian.ImageChannelTools;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.IntStream;
+
+import static qupath.ext.braian.BraiAnExtension.getLogger;
+
+<span class="nc" id="L16">public class WatershedCellDetectionConfig {</span>
+    public static int findThreshold(ImageChannelTools channel, AutoThresholdParmameters params) {
+<span class="nc" id="L18">        int windowSize = params.getSmoothWindowSize();</span>
+        ChannelHistogram histogram;
+        try {
+<span class="nc" id="L21">            histogram = channel.getHistogram(params.getResolutionLevel());</span>
+<span class="nc" id="L22">        } catch (IOException ignored) {</span>
+<span class="nc" id="L23">            throw new RuntimeException(&quot;Could not build the channel histogram of '&quot;+channel.getName()+&quot;' to automatically determine the threshold!&quot;);</span>
+<span class="nc" id="L24">        }</span>
+<span class="nc" id="L25">        int[] peaks = histogram.findHistogramPeaks(windowSize, params.getPeakProminence());</span>
+<span class="nc" id="L26">        getLogger().debug(&quot;'{}' histogram peaks (invalid peaks included): {}&quot;, channel.getName(), Arrays.toString(peaks));</span>
+<span class="nc" id="L27">        int threshold =  getNthValidPeak(histogram, peaks, params.getnPeak(), windowSize);</span>
+<span class="nc" id="L28">        getLogger().info(&quot;'{}' automatic threshold: {}&quot;, channel.getName(), threshold);</span>
+<span class="nc" id="L29">        return threshold;</span>
+        // if(peaks.length &lt;= params.getnPeak())
+        //     throw new RuntimeException(&quot;Could not automatically determine the channel threshold of '&quot;+detectionImage+&quot;' from its histogram!&quot;);
+        // return peaks[params.getnPeak()];
+    }
+
+    /**
+     * @param histogram
+     * @param peaks
+     * @param nth
+     * @param windowSize
+     * @return the n-th peak of the histogram excluding the peaks that are not trust-worthy (i.e. those at the beginning and end of the smoothed histogram)
+     */
+    private static int getNthValidPeak(ChannelHistogram histogram, int[] peaks, int nth, int windowSize) {
+<span class="nc" id="L43">        int max = histogram.getMaxValue()-windowSize;</span>
+<span class="nc bnc" id="L44" title="All 4 branches missed.">        OptionalInt firstValid = IntStream.range(0, peaks.length).filter(i -&gt; peaks[i] &gt;= windowSize &amp;&amp; peaks[i] &lt; max).findFirst();</span>
+<span class="nc" id="L45">        int shiftedNth = nth + firstValid.orElseGet(() -&gt; 0);</span>
+<span class="nc" id="L46">        String msg = &quot;Could not automatically determine the channel threshold of '&quot;+histogram.getChannelName()+&quot;' from its histogram!&quot;;</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if(firstValid.isEmpty())</span>
+<span class="nc" id="L48">            throw new RuntimeException(msg+&quot; No peak was found within the trust-worthy interval&quot;);</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (peaks.length &lt;= shiftedNth)</span>
+<span class="nc" id="L50">            throw new RuntimeException(msg+&quot; The histogram doesn't have n peaks in [windowSize:end]&quot;);</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (peaks[shiftedNth] &gt;= max)</span>
+<span class="nc" id="L52">            throw new RuntimeException(msg+&quot; There is at least one valid peak, but not n valid peaks&quot;);</span>
+<span class="nc" id="L53">        return peaks[shiftedNth];</span>
+    }
+
+<span class="nc" id="L56">    private String detectionImage = null; // it is not meant to be in the config file. It will stay null until build() is called</span>
+<span class="nc" id="L57">    private double requestedPixelSizeMicrons = 0.5;</span>
+<span class="nc" id="L58">    private double backgroundRadiusMicrons = 8.0;</span>
+<span class="nc" id="L59">    private boolean backgroundByReconstruction = true; // new from QuPath 0.4.0. Before it was always set to &quot;true&quot;</span>
+<span class="nc" id="L60">    private double medianRadiusMicrons = 0.0;</span>
+<span class="nc" id="L61">    private double sigmaMicrons = 1.5;</span>
+<span class="nc" id="L62">    private double minAreaMicrons = 10.0;</span>
+<span class="nc" id="L63">    private double maxAreaMicrons = 400.0;</span>
+<span class="nc" id="L64">    private double threshold = 100.0;</span>
+<span class="nc" id="L65">    private AutoThresholdParmameters histogramThreshold = null;</span>
+<span class="nc" id="L66">    private boolean watershedPostProcess = true;</span>
+<span class="nc" id="L67">    private double cellExpansionMicrons = 5.0;</span>
+<span class="nc" id="L68">    private boolean includeNuclei = false;</span>
+<span class="nc" id="L69">    private boolean smoothBoundaries = true;</span>
+<span class="nc" id="L70">    private boolean makeMeasurements = true;</span>
+
+    public Map&lt;String,?&gt; build(ImageChannelTools channel) {
+<span class="nc" id="L73">        this.setDetectionImage(channel.getName());</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (this.histogramThreshold != null)</span>
+<span class="nc" id="L75">            this.setThreshold(findThreshold(channel, this.histogramThreshold));</span>
+
+<span class="nc" id="L77">        return Arrays.stream(WatershedCellDetectionConfig.class.getDeclaredFields())</span>
+<span class="nc bnc" id="L78" title="All 4 branches missed.">                .filter(f -&gt; !f.isSynthetic() &amp;&amp; !f.getName().equals(&quot;histogramThreshold&quot;))</span>
+<span class="nc" id="L79">                .reduce(</span>
+                        new HashMap&lt;&gt;(),
+                        (map, field) -&gt; {
+                            try {
+<span class="nc" id="L83">                                map.put(field.getName(), field.get(this));</span>
+<span class="nc" id="L84">                            } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L85">                                throw new RuntimeException(&quot;This should never happen as it gets the field from the class itself!&quot;);</span>
+<span class="nc" id="L86">                            }</span>
+<span class="nc" id="L87">                            return map;</span>
+                        },
+                        (map1, map2) -&gt; {
+<span class="nc" id="L90">                            map1.putAll(map2);</span>
+<span class="nc" id="L91">                            return map1;</span>
+                        }
+                );
+    }
+
+    public String getDetectionImage() {
+<span class="nc" id="L97">        return detectionImage;</span>
+    }
+
+    public double getRequestedPixelSizeMicrons() {
+<span class="nc" id="L101">        return requestedPixelSizeMicrons;</span>
+    }
+
+    public double getBackgroundRadiusMicrons() {
+<span class="nc" id="L105">        return backgroundRadiusMicrons;</span>
+    }
+
+    public boolean isBackgroundByReconstruction() {
+<span class="nc" id="L109">        return backgroundByReconstruction;</span>
+    }
+
+    public double getMedianRadiusMicrons() {
+<span class="nc" id="L113">        return medianRadiusMicrons;</span>
+    }
+
+    public double getSigmaMicrons() {
+<span class="nc" id="L117">        return sigmaMicrons;</span>
+    }
+
+    public double getMinAreaMicrons() {
+<span class="nc" id="L121">        return minAreaMicrons;</span>
+    }
+
+    public double getMaxAreaMicrons() {
+<span class="nc" id="L125">        return maxAreaMicrons;</span>
+    }
+
+    public double getThreshold() {
+<span class="nc" id="L129">        return threshold;</span>
+    }
+
+    public boolean isWatershedPostProcess() {
+<span class="nc" id="L133">        return watershedPostProcess;</span>
+    }
+
+    public double getCellExpansionMicrons() {
+<span class="nc" id="L137">        return cellExpansionMicrons;</span>
+    }
+
+    public boolean isIncludeNuclei() {
+<span class="nc" id="L141">        return includeNuclei;</span>
+    }
+
+    public boolean isSmoothBoundaries() {
+<span class="nc" id="L145">        return smoothBoundaries;</span>
+    }
+
+    public boolean isMakeMeasurements() {
+<span class="nc" id="L149">        return makeMeasurements;</span>
+    }
+
+    public void setDetectionImage(String detectionImage) {
+<span class="nc" id="L153">        this.detectionImage = detectionImage;</span>
+<span class="nc" id="L154">    }</span>
+
+    public void setRequestedPixelSizeMicrons(double requestedPixelSizeMicrons) {
+<span class="nc" id="L157">        this.requestedPixelSizeMicrons = requestedPixelSizeMicrons;</span>
+<span class="nc" id="L158">    }</span>
+
+    public void setBackgroundRadiusMicrons(double backgroundRadiusMicrons) {
+<span class="nc" id="L161">        this.backgroundRadiusMicrons = backgroundRadiusMicrons;</span>
+<span class="nc" id="L162">    }</span>
+
+    public void setBackgroundByReconstruction(boolean backgroundByReconstruction) {
+<span class="nc" id="L165">        this.backgroundByReconstruction = backgroundByReconstruction;</span>
+<span class="nc" id="L166">    }</span>
+
+    public void setMedianRadiusMicrons(double medianRadiusMicrons) {
+<span class="nc" id="L169">        this.medianRadiusMicrons = medianRadiusMicrons;</span>
+<span class="nc" id="L170">    }</span>
+
+    public void setSigmaMicrons(double sigmaMicrons) {
+<span class="nc" id="L173">        this.sigmaMicrons = sigmaMicrons;</span>
+<span class="nc" id="L174">    }</span>
+
+    public void setMinAreaMicrons(double minAreaMicrons) {
+<span class="nc" id="L177">        this.minAreaMicrons = minAreaMicrons;</span>
+<span class="nc" id="L178">    }</span>
+
+    public void setMaxAreaMicrons(double maxAreaMicrons) {
+<span class="nc" id="L181">        this.maxAreaMicrons = maxAreaMicrons;</span>
+<span class="nc" id="L182">    }</span>
+
+    public void setThreshold(double threshold) {
+<span class="nc" id="L185">        this.threshold = threshold;</span>
+<span class="nc" id="L186">    }</span>
+
+    public void setWatershedPostProcess(boolean watershedPostProcess) {
+<span class="nc" id="L189">        this.watershedPostProcess = watershedPostProcess;</span>
+<span class="nc" id="L190">    }</span>
+
+    public void setCellExpansionMicrons(double cellExpansionMicrons) {
+<span class="nc" id="L193">        this.cellExpansionMicrons = cellExpansionMicrons;</span>
+<span class="nc" id="L194">    }</span>
+
+    public void setIncludeNuclei(boolean includeNuclei) {
+<span class="nc" id="L197">        this.includeNuclei = includeNuclei;</span>
+<span class="nc" id="L198">    }</span>
+
+    public void setSmoothBoundaries(boolean smoothBoundaries) {
+<span class="nc" id="L201">        this.smoothBoundaries = smoothBoundaries;</span>
+<span class="nc" id="L202">    }</span>
+
+    public void setMakeMeasurements(boolean makeMeasurements) {
+<span class="nc" id="L205">        this.makeMeasurements = makeMeasurements;</span>
+<span class="nc" id="L206">    }</span>
+
+    public AutoThresholdParmameters getHistogramThreshold() {
+<span class="nc" id="L209">        return histogramThreshold;</span>
+    }
+
+    public void setHistogramThreshold(AutoThresholdParmameters histogramThreshold) {
+<span class="nc" id="L213">        this.histogramThreshold = histogramThreshold;</span>
+<span class="nc" id="L214">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

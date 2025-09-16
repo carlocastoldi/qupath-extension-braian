@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProjectsConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian.config</a> &gt; <span class="el_source">ProjectsConfig.java</span></div><h1>ProjectsConfig.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian.config;
+
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.Constructor;
+import org.yaml.snakeyaml.error.YAMLException;
+import qupath.ext.braian.BraiAnExtension;
+import qupath.ext.braian.utils.BraiAn;
+import qupath.lib.objects.PathAnnotationObject;
+import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+import static qupath.ext.braian.BraiAnExtension.getLogger;
+
+/**
+ * This class reads a YAML file and can be used to apply the given parameters to the computation offered by BraiAn extension
+ * For more information, read &lt;a href=&quot;https://github.com/carlocastoldi/qupath-extension-braian/blob/master/BraiAn.yml&quot;&gt;this config file example&lt;/a&gt;.
+ */
+<span class="nc" id="L30">public class ProjectsConfig {</span>
+    /**
+     * Reads a BraiAn configuration file
+     * @param yamlFileName the name of the file, not the path.
+     *                     It will then search it first into the project's directory and, if it wasn't there, in its parent directory.
+     *                     If it cannot still find it, it throws {@link java.io.FileNotFoundException}
+     * @return an instance of &lt;code&gt;ProjectsConfig&lt;/code&gt;
+     * @throws IOException if it found the config file, but it had problems while reading it.
+     * @throws YAMLException if it found and read the config file, but it was badly formatted.
+     */
+    public static ProjectsConfig read(String yamlFileName) throws IOException, YAMLException {
+<span class="nc" id="L41">        Path filePath = BraiAn.resolvePath(yamlFileName);</span>
+<span class="nc" id="L42">        getLogger().info(&quot;using '{}' configuration file.&quot;, filePath);</span>
+<span class="nc" id="L43">        String configStream = Files.readString(filePath, StandardCharsets.UTF_8);</span>
+
+        try {
+<span class="nc" id="L46">            Constructor c = new Constructor(ProjectsConfig.class, new LoaderOptions());</span>
+<span class="nc" id="L47">            return new Yaml(c).load(configStream);</span>
+<span class="nc" id="L48">        } catch (YAMLException e) {</span>
+<span class="nc" id="L49">            getLogger().error(&quot;Could not interpret the file '{}'. Please check that it is correctly formatted!&quot;, filePath);</span>
+<span class="nc" id="L50">            throw e;</span>
+        }
+    }
+
+<span class="nc" id="L54">    private String classForDetections = null;</span>
+<span class="nc" id="L55">    private DetectionsCheckConfig detectionsCheck = new DetectionsCheckConfig();</span>
+<span class="nc" id="L56">    private List&lt;ChannelDetectionsConfig&gt; channelDetections = List.of();</span>
+
+    public String getClassForDetections() {
+<span class="nc" id="L59">        return classForDetections;</span>
+    }
+
+    /**
+     * Finds (or creates) the annotations chosen for computing the detections, accordingly to the configuration file.
+     * It reads the value of 'classForDetections' in the YAML and searches all annotations having the appointed classification
+     * @param hierarchy where to search the annotations in
+     * @return the annotations to be used for computing the detections
+     * @see qupath.ext.braian.ChannelDetections
+     */
+    public Collection&lt;PathAnnotationObject&gt; getAnnotationsForDetections(PathObjectHierarchy hierarchy) {
+<span class="nc" id="L70">        String classForDetections = this.getClassForDetections();</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if(classForDetections == null)</span>
+<span class="nc" id="L72">            return null;</span>
+<span class="nc" id="L73">        return hierarchy.getAnnotationObjects()</span>
+<span class="nc" id="L74">                .stream()</span>
+<span class="nc bnc" id="L75" title="All 4 branches missed.">                .filter(annotation -&gt; annotation.getPathClass() != null &amp;&amp; classForDetections.equals(annotation.getPathClass().getName()))</span>
+                //.filter(annotation -&gt; classForDetections.equals(annotation.getName()))
+<span class="nc" id="L77">                .map(annotation -&gt; (PathAnnotationObject) annotation)</span>
+<span class="nc" id="L78">                .toList();</span>
+    }
+
+    public void setClassForDetections(String classForDetections) {
+<span class="nc" id="L82">        this.classForDetections = classForDetections;</span>
+<span class="nc" id="L83">    }</span>
+
+    public DetectionsCheckConfig getDetectionsCheck() {
+<span class="nc" id="L86">        return detectionsCheck;</span>
+    }
+
+    public void setDetectionsCheck(DetectionsCheckConfig detectionsCheck) {
+<span class="nc" id="L90">        this.detectionsCheck = detectionsCheck;</span>
+<span class="nc" id="L91">    }</span>
+
+    /**
+     * Retrieves the name of the channel to be used as control in the overlapping
+     * @return an empty optional if no overlapping is desired or if there there is only one image channel to compute the detections for
+     * @see qupath.ext.braian.OverlappingDetections
+     */
+    public Optional&lt;String&gt; getControlChannel() {
+<span class="nc bnc" id="L99" title="All 4 branches missed.">        if (!this.detectionsCheck.getApply() || this.channelDetections.size() &lt; 2) // if there is only one channel with detections, it is useless to have a controlChannel</span>
+<span class="nc" id="L100">            return Optional.empty();</span>
+<span class="nc" id="L101">        String name = this.detectionsCheck.getControlChannel();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (name == null)</span>
+<span class="nc" id="L103">            name =  this.channelDetections.get(0).getName();</span>
+<span class="nc" id="L104">        return Optional.of(name);</span>
+    }
+
+    public List&lt;ChannelDetectionsConfig&gt; getChannelDetections() {
+<span class="nc" id="L108">        return channelDetections;</span>
+    }
+
+    public void setChannelDetections(List&lt;ChannelDetectionsConfig&gt; channelDetections) {
+<span class="nc" id="L112">        this.channelDetections = channelDetections;</span>
+<span class="nc" id="L113">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
