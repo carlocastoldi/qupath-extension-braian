@@ -34,7 +34,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Download dependencies # used by by Gradle for jacocoTestReport.printJacocoCoverage
-        run: sudo apt-get install libxml2-utils
+        run: sudo apt-get update; sudo apt-get install libxml2-utils
 
       - name: Build project
         run: ./gradlew build
