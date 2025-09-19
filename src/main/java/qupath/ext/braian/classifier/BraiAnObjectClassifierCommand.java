@@ -1724,7 +1724,7 @@ public class BraiAnObjectClassifierCommand implements Runnable {
                     }
                     entry.saveImageData(imageData);
                 } catch (Exception e) {
-                    logger.error("Erreur classification image {} : {}", entry.getImageName(), e.getMessage());
+                    logger.error("Error classification image {} : {}", entry.getImageName(), e.getMessage());
                 }
             }
         }
