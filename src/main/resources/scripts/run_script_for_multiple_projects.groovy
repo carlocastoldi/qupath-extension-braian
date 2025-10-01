@@ -32,13 +32,13 @@ PROJECT_NAMES = [
 SCRIPT_PATH = "/path/to/script.groovy"
 
 var qupathGUI = QPEx.getQuPath()
-var script = new File(script)
+var script = new File(SCRIPT_PATH)
 if (!script.exists()) {
     println "Can't find the given script: "+script
     return
 }
 PROJECT_NAMES.each {
-    var projectFile = Paths.get(PROJECTS_DIR, it, projectFileName+"."+ProjectIO.DEFAULT_PROJECT_EXTENSION).toFile()
+    var projectFile = Paths.get(PROJECTS_DIR, it, PROJECT_FILE_NAME+"."+ProjectIO.DEFAULT_PROJECT_EXTENSION).toFile()
     var thisProject = ProjectIO.loadProject(projectFile, BufferedImage.class)
     FXUtils.runOnApplicationThread({qupathGUI.setProject(thisProject)})
     run(script)
