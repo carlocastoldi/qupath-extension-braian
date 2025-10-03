@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChannelDetectionsConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian.config</a> &gt; <span class="el_source">ChannelDetectionsConfig.java</span></div><h1>ChannelDetectionsConfig.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian.config;
+
+import java.util.List;
+
+<span class="nc" id="L9">public class ChannelDetectionsConfig {</span>
+    private String name;
+<span class="nc" id="L11">    private WatershedCellDetectionConfig parameters = new WatershedCellDetectionConfig();</span>
+<span class="nc" id="L12">    private List&lt;ChannelClassifierConfig&gt; classifiers = List.of(); // maps classifier name to annotation names</span>
+
+    public String getName() {
+<span class="nc" id="L15">        return name;</span>
+    }
+
+    public void setName(String name) {
+<span class="nc" id="L19">        this.name = name;</span>
+<span class="nc" id="L20">        this.parameters.setDetectionImage(name);</span>
+<span class="nc" id="L21">    }</span>
+
+    public WatershedCellDetectionConfig getParameters() {
+<span class="nc" id="L24">        return parameters;</span>
+    }
+
+    public void setParameters(WatershedCellDetectionConfig parameters) {
+<span class="nc" id="L28">        this.parameters = parameters;</span>
+<span class="nc" id="L29">    }</span>
+
+    public List&lt;ChannelClassifierConfig&gt; getClassifiers() {
+<span class="nc" id="L32">        return classifiers;</span>
+    }
+
+    public void setClassifiers(List&lt;ChannelClassifierConfig&gt; classifiers) {
+<span class="nc bnc" id="L36" title="All 2 branches missed.">        for (ChannelClassifierConfig classifier: classifiers) {</span>
+<span class="nc" id="L37">            classifier.setChannel(this.name);</span>
+<span class="nc" id="L38">        }</span>
+<span class="nc" id="L39">        this.classifiers = classifiers;</span>
+<span class="nc" id="L40">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
