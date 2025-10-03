@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static qupath.ext.braian.BraiAnExtension.getLogger;
+import static qupath.ext.braian.BraiAnExtension.logger;
 
 class ImportedAtlasNotFound extends RuntimeException {
     public ImportedAtlasNotFound() {
@@ -161,7 +162,8 @@ public class AtlasManager {
      * Flattens the atlas's ontology into a list of annotations.
      * It may return some non-region annotations too, if the atlas hierarchy was modified with added/removed elements.
      * @return the list of all brain regions in the atlas
-     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted,
+     * and it cannot find all the brain region organised according to the atlas's hierarchy
      * @see #flatten(List)
      */
     public List<PathObject> flatten() {
@@ -177,7 +179,8 @@ public class AtlasManager {
      * <br>
      * It may still return some non-region annotations, if the atlas hierarchy was further modified with added/removed elements.
      * @return the list of all brain regions in the atlas
-     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted,
+     * and it cannot find all the brain region organised according to the atlas's hierarchy
      * @see #flatten()
      */
     public List<PathObject> flatten(List<AbstractDetections> detections) {
@@ -197,7 +200,8 @@ public class AtlasManager {
      * @param detections the list of detection of which to gather the data for each region
      * @param file the file where it should write to. Note that if the file exists, it will be overwritten
      * @throws ExclusionMistakeException if the atlas hierarchy contains regions classified as {@link #EXCLUDE_CLASSIFICATION}.
-     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted,
+     * and it cannot find all the brain region organised according to the atlas's hierarchy
      */
     // Olivier Burri <https://github.com/lacan> wrote mostly of this function and published under Apache-2.0 license for qupath-extension-biop
     public boolean saveResults(List<AbstractDetections> detections, File file) {
@@ -258,16 +262,11 @@ public class AtlasManager {
     }
 
     /**
-     * Gets all the brain regions that should be excluded from further analysis due to being missing or badly aligned to the image.
-     * A brain region, in order to be excluded, must:
-     * <ul>
-     *   <li>either be contained into a larger annotation, classified as "Exclude"
-     * 	 <li>or be <b>duplicated</b> (SHIFT+D) outside the Atlas's hierarchy, and then classified as "Exclude"
-     * </ul>
-     * @return a set of brain regions' annotations that should be excluded.
-     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * Gets all the annotations that are covered by another annotation, classified as "Exclude"
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted,
+     * and it cannot find all the brain region organised according to the atlas's hierarchy
      */
-    public Set<PathObject> getExcludedBrainRegions() {
+    private Set<PathObject> getExcludedAnnotations() {
         if (this.atlasObject.getChildObjects().isEmpty())
             throw new DisruptedAtlasHierarchy(this.atlasObject);
         List<PathObject> excludeAnnotations = AtlasManager.getExclusionAnnotations(this.hierarchy);
@@ -278,15 +277,39 @@ public class AtlasManager {
                 .filter( ann -> ann.getPathClass() != AtlasManager.EXCLUDE_CLASSIFICATION && ann != this.atlasObject)
                 .toList();
         // Loop over exclusions that contain the annotations to be removed/excluded
-        Set<PathObject> regionsToExcludeFlattened = excludeAnnotations.stream()
+        return excludeAnnotations.stream()
                 .map(exclusion -> exclusion.getROI().getGeometry())
                 .flatMap(exclusion -> otherAnnotations.stream().filter(ann -> ann.getROI().getGeometry().coveredBy(exclusion)))
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * Gets all the brain regions that should be excluded from further analysis due to being missing or badly aligned to the image.
+     * A brain region, in order to be excluded, must:
+     * <ul>
+     *   <li>either be contained into a larger annotation, classified as "Exclude"
+     * 	 <li>or be <b>duplicated</b> (SHIFT+D) outside the Atlas's hierarchy, and then classified as "Exclude"
+     * </ul>
+     * @return a set of brain regions' annotations that should be excluded.
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted,
+     * and it cannot find all the brain region organised according to the atlas's hierarchy
+     */
+    public Set<PathObject> getExcludedBrainRegions() {
+        Set<PathObject> annotationsToExcludeFlattened = this.getExcludedAnnotations();
+        Set<PathObject> brainRegions = new HashSet<>(this.flatten());
+        Set<PathObject> regionsToExcludeFlattened = annotationsToExcludeFlattened.stream()
+                .filter(o -> o.getPathClass() != null && brainRegions.contains(o)).collect(Collectors.toSet());
+        Set<PathObject> weirdExcludedAnnotations = annotationsToExcludeFlattened.stream()
+                .filter(o -> !regionsToExcludeFlattened.contains(o)).collect(Collectors.toSet());
+        if (!weirdExcludedAnnotations.isEmpty())
+            getLogger().error("Annotations excluded outside atlas ontology will be ignored. Make sure these annotations weren't meant to be classified as  '{}': [{}]",
+                    EXCLUDE_CLASSIFICATION.toString(),
+                    BraiAn.join(weirdExcludedAnnotations, ", "));
         // remove 'child' annotations that are descendant of an excluded parent
         var regionsToExclude = new HashSet<>(regionsToExcludeFlattened);
         for (PathObject r1: regionsToExcludeFlattened) {
             List<PathObject> descendants = AtlasManager.flattenObject(r1);
-            for (PathObject r2: regionsToExcludeFlattened)
+            for (PathObject r2 : regionsToExcludeFlattened)
                 if (descendants.indexOf(r2) > 0) // in 0 there is r1 itself, the parent annotation
                     regionsToExclude.remove(r2);
         }
@@ -297,7 +320,8 @@ public class AtlasManager {
      * Saves a file containing, on each line, the name and hemisphere of the regions to be excluded.
      * @param file the file where it should write to. Note that if the file exists, it will be overwritten
      * @return true if the file was correctly saved.
-     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted,
+     * and it cannot find all the brain region organised according to the atlas's hierarchy
      * @see #getExcludedBrainRegions()
      * @see #saveResults(List, File)
      */
@@ -311,8 +335,10 @@ public class AtlasManager {
             }
         QP.mkdirs(file.getAbsoluteFile().getParent());
 
-        Set<PathObject> regionsToExcludeSet = this.getExcludedBrainRegions();
+        Set<PathObject> regionsToExcludeSet = this.getExcludedBrainRegions(); // NOTE: may return things that aren't brain regions
+
         List<PathObject> regionsToExclude = regionsToExcludeSet.stream()
+                .filter(o -> o.getPathClass() != null)
                 .sorted(Comparator.comparing(o -> o.getPathClass().toString()))
                 .toList();
         getLogger().info("Excluded regions: [{}]", BraiAn.join(regionsToExclude, ", "));
@@ -337,7 +363,8 @@ public class AtlasManager {
      * Return whether the current atlas is split between left and right hemispheres.
      * Atlas hierarchies that were modified by deleting one of the two hemispheres, are still recognised as split.
      * @return true if the current atlas is split between left and right hemispheres.
-     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted,
+     * and it cannot find all the brain region organised according to the atlas's hierarchy
      * whether the atlas was split between left and right.
      */
     public boolean isSplit() {
@@ -368,7 +395,8 @@ public class AtlasManager {
      *   <li>If a region was excluded within the atlas hierarchy</li>
      *   <li>If a region's classifications was removed</li>
      * </ul>
-     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted, and it is not possible to deduce
+     * @throws DisruptedAtlasHierarchy if the current atlas hierarchy was disrupted,
+     * and it cannot find all the brain region organised according to the atlas's hierarchy
      */
     public void fixExclusions() {
         if (this.atlasObject.getChildObjects().isEmpty())
