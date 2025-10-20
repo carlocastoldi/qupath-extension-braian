@@ -26,6 +26,7 @@ dependencies {
     shadow(libs.bundles.logging)
     shadow(libs.qupath.fxtras)
     shadow(libs.snakeyaml)
+    shadow("io.github.qupath:qupath-extension-processing")
 
     // For testing
     testImplementation(libs.bundles.qupath)
