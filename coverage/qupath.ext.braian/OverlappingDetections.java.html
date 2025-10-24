@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OverlappingDetections.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian</a> &gt; <span class="el_source">OverlappingDetections.java</span></div><h1>OverlappingDetections.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian;
+
+import qupath.lib.objects.PathAnnotationObject;
+import qupath.lib.objects.PathDetectionObject;
+import qupath.lib.objects.PathObjects;
+import qupath.lib.objects.classes.PathClass;
+import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+import qupath.lib.roi.interfaces.ROI;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * This class allows to compute and manage double/triple/multiple positive detections.
+ * It does so by leveraging {@link AbstractDetections} interface
+ */
+public class OverlappingDetections extends AbstractDetections {
+    public static final String OVERLAP_DELIMITER = &quot;~&quot;;
+
+    /**
+     * Creates all the names of the possible overlaps between the given PathClasses names
+     * @param primitiveClasses a list of PathClasses names
+     * @return a list combinations of the given primitiveClasses, delimited by {@link OverlappingDetections#OVERLAP_DELIMITER}
+     */
+    public static List&lt;String&gt; createAllOverlappingClassNames(List&lt;String&gt; primitiveClasses) {
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        if(primitiveClasses.isEmpty())</span>
+<span class="nc" id="L34">            return List.of();</span>
+<span class="nc" id="L35">        String first = primitiveClasses.get(0);</span>
+<span class="nc" id="L36">        List&lt;String&gt; others = primitiveClasses.subList(1, primitiveClasses.size());</span>
+<span class="nc" id="L37">        List&lt;String&gt; othersOverlappingClasses = createAllOverlappingClassNames(others);</span>
+<span class="nc" id="L38">        return Stream.concat(</span>
+<span class="nc" id="L39">                Stream.of(first),</span>
+<span class="nc" id="L40">                Stream.concat(</span>
+<span class="nc" id="L41">                        othersOverlappingClasses.stream(),</span>
+<span class="nc" id="L42">                        othersOverlappingClasses.stream().map(postfix -&gt; first+OverlappingDetections.OVERLAP_DELIMITER+postfix))</span>
+<span class="nc" id="L43">        ).toList();</span>
+    }
+
+    private static String createOverlappingClassName(String primary, List&lt;String&gt; others) {
+<span class="nc" id="L47">        return Stream.concat(Stream.of(primary), others.stream())</span>
+<span class="nc" id="L48">                .collect(Collectors.joining(OverlappingDetections.OVERLAP_DELIMITER));</span>
+    }
+
+    private static Collection&lt;PathClass&gt; getAllPossibleOverlappingClassifications(AbstractDetections control,
+                                                                                  Collection&lt;AbstractDetections&gt; otherDetections) {
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (otherDetections.isEmpty())</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;You have to overlap at least two detections; 'others' cannot be empty&quot;);</span>
+<span class="nc" id="L55">        return OverlappingDetections.createAllOverlappingClassNames(</span>
+<span class="nc" id="L56">                        otherDetections.stream().map(AbstractDetections::getId).toList())</span>
+<span class="nc" id="L57">                .stream()</span>
+<span class="nc" id="L58">                .map(name -&gt; control.getId()+OverlappingDetections.OVERLAP_DELIMITER+name)</span>
+<span class="nc" id="L59">                .map(PathClass::fromString)</span>
+<span class="nc" id="L60">                .toList();</span>
+    }
+
+    /**
+     * Creates an instance of overlapping detections
+     * @param control the detections used to check whether the other detections are overlapping between them and the control
+     * @param others the other detections
+     * @param compute if true, it will delete any previous overlap and compute the overlap between detections.
+     *                If false, it will try to retrieve pre-computed ovarlappings
+     * @param hierarchy where to find/compute the overlapping detections
+     * @throws NoCellContainersFoundException if no pre-computed overlappings were found in the given hierarchy
+     */
+    public OverlappingDetections(AbstractDetections control,
+                                 Collection&lt;AbstractDetections&gt; others,
+                                 boolean compute, PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
+<span class="nc" id="L75">        super(control.getId(), getAllPossibleOverlappingClassifications(control, others), hierarchy);</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (!compute)</span>
+<span class="nc" id="L77">            return;</span>
+<span class="nc" id="L78">        this.overlap(control, others);</span>
+<span class="nc" id="L79">        this.fireUpdate();</span>
+<span class="nc" id="L80">    }</span>
+
+    /**
+     * Creates an instance based on pre-computed overlapping detections
+     * @param control the detections used to check whether the other detections are overlapping between them and the control
+     * @param others the other detections
+     * @param hierarchy where to find the overlapping detections
+     * @throws NoCellContainersFoundException if no pre-computed overlappings were found in the given hierarchy
+     */
+    public OverlappingDetections(AbstractDetections control,
+                                 Collection&lt;AbstractDetections&gt; others,
+                                 PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
+<span class="nc" id="L92">        this(control, others, false, hierarchy);</span>
+<span class="nc" id="L93">    }</span>
+
+    @Override
+    public String getContainersName() {
+<span class="nc" id="L97">        return this.getId()+&quot; overlaps&quot;;</span>
+    }
+
+    private void overlap(AbstractDetections control, Collection&lt;AbstractDetections&gt; otherDetections) {
+<span class="nc" id="L101">        List&lt;PathDetectionObject&gt; overlaps = control.toStream().flatMap(cell -&gt; copyDetectionIfOverlapping(cell, control, otherDetections).stream()).toList();</span>
+<span class="nc" id="L102">        this.getHierarchy().addObjects(overlaps);</span>
+        // add all duplicated overlapping cells to a new annotation
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (PathAnnotationObject container : control.getContainers()) {</span>
+<span class="nc" id="L105">            PathAnnotationObject containerParent = (PathAnnotationObject) container.getParent();</span>
+<span class="nc" id="L106">            PathAnnotationObject overlapsContainer = this.createContainer(containerParent, true);</span>
+<span class="nc" id="L107">            ROI containerRoi = overlapsContainer.getROI();</span>
+<span class="nc" id="L108">            overlaps.stream()</span>
+<span class="nc" id="L109">                    .filter(overlap -&gt; containerRoi.contains(overlap.getROI().getCentroidX(), overlap.getROI().getCentroidY()))</span>
+<span class="nc" id="L110">                    .forEach(overlap -&gt; this.getHierarchy().addObjectBelowParent(overlapsContainer, overlap, false));</span>
+<span class="nc" id="L111">        }</span>
+<span class="nc" id="L112">    }</span>
+
+    private static Optional&lt;PathDetectionObject&gt; copyDetectionIfOverlapping(PathDetectionObject cell,
+                                                                            AbstractDetections control,
+                                                                            Collection&lt;AbstractDetections&gt; otherDetections) {
+<span class="nc" id="L117">        List&lt;String&gt; overlappingDetectionsIds = otherDetections.stream()</span>
+<span class="nc" id="L118">                .filter(other -&gt; other.getOverlappingObjectIfPresent(cell).isPresent())</span>
+<span class="nc" id="L119">                .map(AbstractDetections::getId)</span>
+<span class="nc" id="L120">                .toList();</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (overlappingDetectionsIds.isEmpty())</span>
+<span class="nc" id="L122">            return Optional.empty();</span>
+<span class="nc" id="L123">        String className = createOverlappingClassName(control.getId(), overlappingDetectionsIds);</span>
+<span class="nc" id="L124">        PathClass overlapClass = PathClass.fromString(className);</span>
+<span class="nc" id="L125">        PathDetectionObject cellCopy = (PathDetectionObject) PathObjects.createDetectionObject(cell.getROI(), overlapClass);</span>
+<span class="nc" id="L126">        return Optional.of(cellCopy);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

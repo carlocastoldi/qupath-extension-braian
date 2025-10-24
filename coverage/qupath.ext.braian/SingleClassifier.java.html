@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SingleClassifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian</a> &gt; <span class="el_source">SingleClassifier.java</span></div><h1>SingleClassifier.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2018 - 2020 QuPath developers, The University of Edinburgh
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian;
+
+import qupath.lib.classifiers.object.AbstractObjectClassifier;
+import qupath.lib.images.ImageData;
+import qupath.lib.objects.PathObject;
+import qupath.lib.objects.PathObjectFilter;
+import qupath.lib.objects.classes.PathClass;
+import qupath.lib.objects.classes.PathClassTools;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+public class SingleClassifier&lt;T&gt; extends AbstractObjectClassifier&lt;T&gt; {
+    private final PathClass pathClass;
+    private final List&lt;PathClass&gt; pathClasses;
+
+    public SingleClassifier(PathClass pathClass) {
+<span class="nc" id="L24">        super(PathObjectFilter.DETECTIONS_ALL);</span>
+<span class="nc" id="L25">        this.pathClass = pathClass;</span>
+<span class="nc" id="L26">        this.pathClasses = Collections.unmodifiableList(List.of(pathClass));</span>
+<span class="nc" id="L27">    }</span>
+
+    @Override
+    public Collection&lt;PathClass&gt; getPathClasses() {
+<span class="nc" id="L31">        return pathClasses;</span>
+    }
+
+    @Override
+    public int classifyObjects(ImageData&lt;T&gt; imageData, Collection&lt;? extends PathObject&gt; pathObjects, boolean resetExistingClass) {
+<span class="nc" id="L36">        int n = 0;</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        for (var pathObject : pathObjects) {</span>
+<span class="nc" id="L38">            var previousClass = pathObject.getPathClass();</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">            if (resetExistingClass)</span>
+<span class="nc" id="L40">                pathObject.resetPathClass();</span>
+
+<span class="nc bnc" id="L42" title="All 2 branches missed.">            if (this.pathClass != null) {</span>
+<span class="nc" id="L43">                var currentClass = pathObject.getPathClass();</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">                if (currentClass == null)</span>
+<span class="nc" id="L45">                    pathObject.setPathClass(this.pathClass);</span>
+                else
+<span class="nc" id="L47">                    pathObject.setPathClass(</span>
+<span class="nc" id="L48">                            PathClassTools.mergeClasses(currentClass, this.pathClass)</span>
+                    );
+            }
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            if (previousClass != pathObject.getPathClass())</span>
+<span class="nc" id="L52">                n++;</span>
+<span class="nc" id="L53">        }</span>
+<span class="nc" id="L54">        return n;</span>
+    }
+
+    @Override
+    public Map&lt;String, Integer&gt; getMissingFeatures(ImageData&lt;T&gt; imageData, Collection&lt;? extends PathObject&gt; pathObjects) {
+<span class="nc" id="L59">        return Collections.emptyMap();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

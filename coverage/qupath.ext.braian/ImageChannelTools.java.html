@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImageChannelTools.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian</a> &gt; <span class="el_source">ImageChannelTools.java</span></div><h1>ImageChannelTools.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian;
+
+import ij.ImagePlus;
+import ij.process.ImageProcessor;
+import ij.process.ImageStatistics;
+import qupath.imagej.tools.IJTools;
+import qupath.lib.images.ImageData;
+import qupath.lib.images.PathImage;
+import qupath.lib.images.servers.ImageChannel;
+import qupath.lib.images.servers.ImageServer;
+import qupath.lib.images.servers.ImageServerMetadata;
+import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+import qupath.lib.regions.RegionRequest;
+
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+
+class IllegalChannelName extends RuntimeException {
+    public IllegalChannelName(String name) {
+<span class="nc" id="L24">        super(String.format(&quot;Cannot find a channel named '&quot;+name+&quot;'!&quot;));</span>
+<span class="nc" id="L25">    }</span>
+}
+
+public class ImageChannelTools {
+    private final String name;
+    private final ImageData&lt;BufferedImage&gt; imageData;
+    private final ImageServer&lt;BufferedImage&gt; server;
+    private final int nChannel;
+
+    /**
+     * Creates an {@link ImageChannelTools} from the given channel name and {@link ImageServer}
+     * @param name name of the channel
+     * @param server image server to which the channel is referring to
+     */
+    @Deprecated(since = &quot;1.1.1&quot;)
+<span class="nc" id="L40">    public ImageChannelTools(String name, ImageServer&lt;BufferedImage&gt; server) {</span>
+<span class="nc" id="L41">        this.name = name;</span>
+<span class="nc" id="L42">        this.imageData = null;</span>
+<span class="nc" id="L43">        this.server = server;</span>
+<span class="nc" id="L44">        this.nChannel = this.findNChannel();</span>
+<span class="nc" id="L45">    }</span>
+
+    /**
+     * Crates an {@link ImageChannelTools} from the given channel name and {@link ImageData}
+     * @param name name of the channel
+     * @param imageData data of the image to which the channel is referring to
+     */
+<span class="nc" id="L52">    public ImageChannelTools(String name, ImageData&lt;BufferedImage&gt; imageData) {</span>
+<span class="nc" id="L53">        this.name = name;</span>
+<span class="nc" id="L54">        this.imageData = imageData;</span>
+<span class="nc" id="L55">        this.server = null;</span>
+<span class="nc" id="L56">        this.nChannel = this.findNChannel();</span>
+<span class="nc" id="L57">    }</span>
+
+    private ImageServer&lt;BufferedImage&gt; getServer() {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (this.server != null)</span>
+<span class="nc" id="L61">            return this.server;</span>
+<span class="nc" id="L62">        return this.imageData.getServer();</span>
+    }
+
+    private ImageServerMetadata getMetadata() {
+<span class="nc" id="L66">        return this.imageData.getServerMetadata();</span>
+    }
+
+    private int findNChannel() {
+<span class="nc" id="L70">        int nChannel = 0;</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        for (ImageChannel ch: this.getMetadata().getChannels()) {</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            if(ch.getName().equals(this.name))</span>
+<span class="nc" id="L73">                return nChannel;</span>
+<span class="nc" id="L74">            nChannel++;</span>
+<span class="nc" id="L75">        }</span>
+<span class="nc" id="L76">        throw new IllegalChannelName(this.name);</span>
+    }
+
+    /**
+     * @return index of the corresponding channel used by QuPath
+     */
+    public int getnChannel() {
+<span class="nc" id="L83">        return this.nChannel;</span>
+    }
+
+    /**
+     * Computes the {@link ChannelHistogram} of the current channel at the given resolution.
+     * @param resolutionLevel Resolution level, If it's bigger than {@link ImageServer#nResolutions()}-1,
+     *                        than it uses the igven n-th resolution.
+     * @return the histogram of the given channel
+     * @throws IOException when it fails to read the image file to build the histogram
+     * @see #getChannelStats(int)
+     * @see ImageServer#getDownsampleForResolution(int)
+     */
+    public ChannelHistogram getHistogram(int resolutionLevel) throws IOException {
+<span class="nc" id="L96">        return new ChannelHistogram(this.name, this.getImageProcessor(resolutionLevel));</span>
+    }
+
+    /**
+     * Retrieves the corresponding {@link ImageProcessor} of the current channel at the given resolution.
+     * @param resolutionLevel Resolution level, If it's bigger than {@link ImageServer#nResolutions()}-1,
+     *                        than it uses the given n-th resolution.
+     * @return the image channel as processed by ImageJ at the given resolution
+     * @throws IOException when it fails to read the image file
+     * @see #getChannelStats(int)
+     * @see ImageServer#getDownsampleForResolution(int)
+     */
+    public ImageProcessor getImageProcessor(int resolutionLevel) throws IOException {
+<span class="nc" id="L109">        ImageServer&lt;BufferedImage&gt; server = this.getServer();</span>
+<span class="nc" id="L110">        double downsample = server.getDownsampleForResolution(Math.min(server.nResolutions()-1, resolutionLevel));</span>
+<span class="nc" id="L111">        RegionRequest request = RegionRequest.createInstance(server, downsample);</span>
+<span class="nc" id="L112">        PathImage&lt;ImagePlus&gt; pathImage = IJTools.convertToImagePlus(server, request);</span>
+<span class="nc" id="L113">        ImagePlus image = pathImage.getImage();</span>
+
+<span class="nc" id="L115">        int ijChannel = this.nChannel+1; // ij.ImagePlus uses 1-based channels</span>
+<span class="nc" id="L116">        image.setC(ijChannel);</span>
+<span class="nc" id="L117">        ImageProcessor ip = image.getChannelProcessor();</span>
+<span class="nc" id="L118">        ip = ip.duplicate();</span>
+<span class="nc" id="L119">        ip.resetRoi();</span>
+<span class="nc" id="L120">        return ip;</span>
+    }
+
+    /**
+     * Computes the {@link ImageStatistics} of the current channel at the given resolution.
+     * @param resolutionLevel Resolution level, If it's bigger than {@link ImageServer#nResolutions()}-1,
+     *                        than it uses the given n-th resolution.
+     * @return the statistics of the channel computed by ImageJ at the given resolution
+     * @throws IOException when it fails to read the image file
+     * @see #getChannelStats(int)
+     * @see #getImageProcessor(int)
+     * @see ImageServer#getDownsampleForResolution(int)
+     */
+    @Deprecated(since = &quot;1.0.4&quot;)
+    public ImageStatistics getChannelStats(int resolutionLevel) throws IOException {
+<span class="nc" id="L135">        return this.getImageProcessor(resolutionLevel).getStats();</span>
+    }
+
+    /**
+     * @return the name of the associated image channel
+     */
+    public String getName() {
+<span class="nc" id="L142">        return this.name;</span>
+    }
+
+    /**
+     * returns an instance of {@link ChannelDetections}, if existing in the current hierarchy
+     * @param hierarchy where to find the detections
+     * @throws NoCellContainersFoundException if no pre-computed detection was found in the given hierarchy
+     * @see ChannelDetections
+     */
+    public ChannelDetections getDetections(PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
+<span class="nc" id="L152">        return new ChannelDetections(this, hierarchy);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

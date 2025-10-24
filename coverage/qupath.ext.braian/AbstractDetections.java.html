@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractDetections.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian</a> &gt; <span class="el_source">AbstractDetections.java</span></div><h1>AbstractDetections.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian;
+
+import org.locationtech.jts.geom.Geometry;
+import qupath.ext.braian.utils.BraiAn;
+import qupath.lib.classifiers.object.ObjectClassifier;
+import qupath.lib.images.ImageData;
+import qupath.lib.objects.*;
+import qupath.lib.objects.classes.PathClass;
+import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+import qupath.lib.regions.ImagePlane;
+import qupath.lib.roi.GeometryTools;
+import qupath.lib.roi.interfaces.ROI;
+
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * This abstract class defines the interface to handle groups of different cell detections groups.
+ * It works by using on &quot;container&quot; annotations, inside which all the cells are grouped.
+ * By default, {@link AbstractDetections} allows to classify its detections by applying {@link PartialClassifier}s.
+ */
+public abstract class AbstractDetections {
+    private static final int BBH_MAX_DEPTH = 6;
+
+    /**
+     * returns the detections inside the given annotation
+     * @param annotation where to search the detections
+     * @param hierarchy where to find the detections
+     * @return a stream of detections found inside annotations
+     */
+    protected static Stream&lt;PathDetectionObject&gt; getDetectionsInside(PathAnnotationObject annotation, PathObjectHierarchy hierarchy) {
+<span class="nc" id="L37">        return getDetectionsInside(annotation.getROI(), hierarchy);</span>
+    }
+
+    /**
+     * returns the detections inside the given {@link ROI}
+     * @param roi where to search the detections
+     * @param hierarchy where to find the detections
+     * @return a stream of detections found inside annotations
+     */
+    protected static Stream&lt;PathDetectionObject&gt; getDetectionsInside(ROI roi, PathObjectHierarchy hierarchy) {
+<span class="nc" id="L47">        return hierarchy.getObjectsForROI(PathDetectionObject.class, roi)</span>
+<span class="nc" id="L48">                .stream()</span>
+<span class="nc" id="L49">                .map(o -&gt; (PathDetectionObject) o);</span>
+    }
+
+    protected static Stream&lt;PathDetectionObject&gt; getChildrenDetections(PathAnnotationObject annotation) {
+<span class="nc" id="L53">        return annotation.getChildObjects().stream()</span>
+<span class="nc" id="L54">                .filter(PathObject::isDetection)</span>
+<span class="nc" id="L55">                .map(object -&gt; (PathDetectionObject) object);</span>
+    }
+
+    private final String id;
+    private final PathObjectHierarchy hierarchy;
+    private final List&lt;PathClass&gt; detectionClasses;
+<span class="nc" id="L61">    private List&lt;PathAnnotationObject&gt; containers = new ArrayList&lt;&gt;();</span>
+    private BoundingBoxHierarchy bbh;
+
+    /**
+     * Constructs an object that groups together detections of the same kind.
+     * To do so, it searches for container annotations of detections having a name compatible with {@link #getContainersName()}
+     * @param id identification of this group of detections
+     * @param detectionClasses classifications used to identify the detections
+     * @param hierarchy where to find the detections
+     * @throws NoCellContainersFoundException if there is no compatible container in the hierarchy
+     * @see #getContainersName()
+     * @see #getContainersPathClass()
+     */
+<span class="nc" id="L74">    public AbstractDetections(String id, Collection&lt;PathClass&gt; detectionClasses, PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {</span>
+<span class="nc" id="L75">        this.hierarchy = hierarchy;</span>
+<span class="nc" id="L76">        this.id = id;</span>
+<span class="nc" id="L77">        this.detectionClasses = detectionClasses.stream().toList();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        for (PathClass classification: this.detectionClasses)</span>
+<span class="nc" id="L79">            BraiAn.populatePathClassGUI(classification);</span>
+<span class="nc" id="L80">        this.fireUpdate();</span>
+<span class="nc" id="L81">    }</span>
+
+    /**
+     * Updates the internal representation to the current state.
+     * If a new container of detections is added and overlaps the old containers, it updates the old detections with the new ones.
+     * Additionally, it makes sure that the newer containers don't overlap with the old ones.
+     * &lt;br&gt;
+     * If container annotations or detections are touched outside of BraiAn, it's better to call this method.
+     * @throws NoCellContainersFoundException if there is no compatible container in the hierarchy
+     */
+    public void fireUpdate() throws NoCellContainersFoundException {
+<span class="nc" id="L92">        List&lt;PathAnnotationObject&gt; allContainers = this.searchContainers();</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (allContainers.isEmpty()) {</span>
+<span class="nc" id="L94">            this.containers = allContainers;</span>
+<span class="nc" id="L95">            this.bbh = new BoundingBoxHierarchy(new ArrayList&lt;&gt;(), BBH_MAX_DEPTH);</span>
+<span class="nc" id="L96">            return;</span>
+        }
+<span class="nc" id="L98">        List&lt;PathAnnotationObject&gt; oldContainers = allContainers.stream()</span>
+<span class="nc" id="L99">                .filter(c -&gt; this.containers.contains(c)).toList();</span>
+<span class="nc" id="L100">        List&lt;PathAnnotationObject&gt; newContainers = allContainers.stream()</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                .filter(c -&gt; !this.containers.contains(c)).toList();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        for (PathAnnotationObject oldContainer: oldContainers)</span>
+<span class="nc" id="L103">            updateContainer(oldContainer, newContainers); // may shrink the overlapping newContainers</span>
+<span class="nc" id="L104">        this.removeEmptyContainers(allContainers);</span>
+<span class="nc" id="L105">        this.containers = allContainers;</span>
+<span class="nc" id="L106">        List&lt;PathDetectionObject&gt; cells = this.getContainersDetections(false); // throw NoCellContainersFoundException</span>
+<span class="nc" id="L107">        this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);</span>
+<span class="nc" id="L108">    }</span>
+
+    private void updateContainer(PathAnnotationObject oldContainer, List&lt;PathAnnotationObject&gt; newContainers) {
+<span class="nc" id="L111">        ROI oldROI = oldContainer.getROI();</span>
+<span class="nc" id="L112">        Geometry oldGeom = oldROI.getGeometry();</span>
+<span class="nc" id="L113">        ImagePlane oldPlane = oldROI.getImagePlane();</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        for (PathAnnotationObject newContainer: newContainers) {</span>
+<span class="nc" id="L115">            Geometry newGeom = newContainer.getROI().getGeometry();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (oldGeom.intersects(newGeom)) {</span>
+<span class="nc" id="L117">                ROI intersection = GeometryTools.geometryToROI(oldGeom.intersection(newGeom), oldPlane);</span>
+<span class="nc" id="L118">                List&lt;PathDetectionObject&gt; newDetections = getChildrenDetections(newContainer).toList(); //collect(Collectors.toSet());</span>
+<span class="nc" id="L119">                this.removeOldDetections(intersection, newDetections);</span>
+<span class="nc" id="L120">                this.addUpdatedDetections(oldContainer, newDetections);</span>
+<span class="nc" id="L121">                ROI newDiffOld = GeometryTools.geometryToROI(newGeom.difference(oldGeom), oldPlane);</span>
+<span class="nc" id="L122">                newContainer.setROI(newDiffOld);</span>
+            }
+<span class="nc" id="L124">        }</span>
+<span class="nc" id="L125">    }</span>
+
+    private void addUpdatedDetections(PathAnnotationObject container, List&lt;PathDetectionObject&gt; newDetections) {
+<span class="nc" id="L128">        newDetections.stream()</span>
+<span class="nc" id="L129">                .filter( newDetection -&gt; container.getROI().contains(newDetection.getROI().getCentroidX(), newDetection.getROI().getCentroidY()))</span>
+<span class="nc" id="L130">                .forEach( newDetection -&gt; this.hierarchy.addObjectBelowParent(container, newDetection, false) );</span>
+<span class="nc" id="L131">    }</span>
+
+    private void removeOldDetections(ROI area, List&lt;PathDetectionObject&gt; newDetections) {
+<span class="nc" id="L134">        BoundingBoxHierarchy newDetectionsBBH = new BoundingBoxHierarchy(newDetections, BBH_MAX_DEPTH);</span>
+<span class="nc" id="L135">        List&lt;PathDetectionObject&gt; oldDetections = AbstractDetections.getDetectionsInside(area, hierarchy)   // it's a detection inside a new container</span>
+<span class="nc bnc" id="L136" title="All 4 branches missed.">                .filter(oldDetection -&gt; this.isChannelDetection(oldDetection, true) &amp;&amp; !newDetectionsBBH.contains(oldDetection))</span>
+<span class="nc" id="L137">                .toList();</span>
+<span class="nc" id="L138">        hierarchy.removeObjects(oldDetections, false);</span>
+<span class="nc" id="L139">    }</span>
+
+    private void removeEmptyContainers(List&lt;PathAnnotationObject&gt; containers) {
+<span class="nc" id="L142">        ListIterator&lt;PathAnnotationObject&gt; iterator = containers.listIterator();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        while (iterator.hasNext()) {</span>
+<span class="nc" id="L144">            PathAnnotationObject c = iterator.next();</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (c.getROI().isEmpty()) {</span>
+<span class="nc" id="L146">                this.hierarchy.removeObject(c, false);</span>
+<span class="nc" id="L147">                iterator.remove();</span>
+            }
+<span class="nc" id="L149">        }</span>
+<span class="nc" id="L150">        this.hierarchy.fireHierarchyChangedEvent(this);</span>
+<span class="nc" id="L151">    }</span>
+
+    /**
+     * If there are no detections within the current instance.
+     * &lt;br&gt;
+     * If the state was changed outside of this extension, you might need to call {@link #fireUpdate()} first.
+     * @return True, if no detections are found within the current state. False otherwise.
+     * @see #fireUpdate()
+     */
+    public boolean isEmpty() {
+        try {
+<span class="nc bnc" id="L162" title="All 4 branches missed.">            return this.containers.isEmpty() || this.getContainersDetections(false).isEmpty();</span>
+<span class="nc" id="L163">        } catch (NoCellContainersFoundException e) {</span>
+<span class="nc" id="L164">            return true;</span>
+        }
+    }
+
+    // TODO: allow to search for containers WITHIN a list of given annotations (useful with 'classForDetections' from ProjectsConfig)
+    private List&lt;PathAnnotationObject&gt; searchContainers() {
+<span class="nc" id="L170">        return this.hierarchy.getAnnotationObjects().stream()</span>
+<span class="nc" id="L171">                .filter(this::isContainer)</span>
+<span class="nc" id="L172">                .map(a -&gt; (PathAnnotationObject) a)</span>
+<span class="nc" id="L173">                .collect(Collectors.toList());  // mutable list</span>
+                // .toList();                   // immutable list
+    }
+
+    /**
+     * @return the container annotations
+     */
+    public List&lt;PathAnnotationObject&gt; getContainers() {
+<span class="nc" id="L181">        return this.containers;</span>
+    }
+
+    protected PathObjectHierarchy getHierarchy() {
+<span class="nc" id="L185">        return hierarchy;</span>
+    }
+
+    /**
+     * @return a string often used to identify detections and their container annotations
+     */
+    public String getId() {
+<span class="nc" id="L192">        return id;</span>
+    }
+
+    /**
+     * @return a stream of the given detections, in no particular order
+     */
+    public Stream&lt;PathDetectionObject&gt; toStream() {
+<span class="nc" id="L199">        return this.bbh.toStream().map(o -&gt; (PathDetectionObject) o);</span>
+    }
+
+    /**
+     * @param o the object to search an overlapping detection for
+     * @return the detection that overlaps the given object
+     * @see BoundingBoxHierarchy#getOverlappingObjectIfPresent(PathObject)
+     */
+    public Optional&lt;PathObject&gt; getOverlappingObjectIfPresent(PathObject o) {
+<span class="nc" id="L208">        return this.bbh.getOverlappingObjectIfPresent(o);</span>
+    }
+
+    /**
+     * @return the name used by the containers of detections of the instance kind
+     */
+    public abstract String getContainersName();
+
+    /**
+     * @param o the object to test
+     * @return true if the given object is a container of these detections. False otherwise
+     */
+    public boolean isContainer(PathObject o) {
+<span class="nc bnc" id="L221" title="All 4 branches missed.">        return o instanceof PathAnnotationObject &amp;&amp; this.getContainersName().equals(o.getName());</span>
+    }
+
+    /**
+     * @return the classification used to indentify containers of detections of the instance kind
+     */
+    public PathClass getContainersPathClass() {
+<span class="nc" id="L228">        return PathClass.fromString(getId());</span>
+    }
+
+    /**
+     * @return the classification used to identify detections of the instance kind that were discarded
+     */
+    public PathClass getDiscardedDetectionsPathClass() {
+        // TODO: should be multiple classifications, so that it's possible to retrieve the initial classifications of all detections
+<span class="nc" id="L236">        return PathClass.getInstance(PathClass.fromString(&quot;Other&quot;), this.getId(), null);</span>
+    }
+
+    /**
+     * @return the classification&lt;b&gt;s&lt;/b&gt; used to identify the detections of the instance kind
+     */
+    public List&lt;PathClass&gt; getDetectionsPathClasses() {
+<span class="nc" id="L243">        return this.detectionClasses;</span>
+    }
+
+    private boolean hasDetectionClass(PathObject o, boolean all) {
+<span class="nc bnc" id="L247" title="All 4 branches missed.">        return this.detectionClasses.contains(o.getPathClass()) ||</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                (all &amp;&amp; this.getDiscardedDetectionsPathClass().equals(o.getPathClass()));</span>
+    }
+
+    /**
+     * checks whether the given object is a detection belonging to the instance kind
+     * @param o the object to test
+     * @param all if true, considers discarded detections also as belonging to the instance kind
+     * @return true if the given object belongs to the instance kind
+     */
+    public boolean isChannelDetection(PathObject o, boolean all) {
+<span class="nc bnc" id="L258" title="All 4 branches missed.">        return o.isDetection() &amp;&amp; this.hasDetectionClass(o, all);</span>
+    }
+
+    /**
+     * returns the list of detections of this instance found only in the containers
+     */
+    private List&lt;PathDetectionObject&gt; getContainersDetections(boolean all) throws NoCellContainersFoundException {
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if(this.containers.isEmpty())</span>
+<span class="nc" id="L266">            throw new NoCellContainersFoundException(this.getClass());</span>
+<span class="nc" id="L267">        return this.containers.stream()</span>
+<span class="nc" id="L268">                .flatMap(container -&gt; AbstractDetections.getChildrenDetections(container)</span>
+<span class="nc" id="L269">                        .filter(object -&gt; this.isChannelDetection(object, all)))</span>
+<span class="nc" id="L270">                .toList();</span>
+    }
+
+    private boolean isDerivedContainer(PathObject object, PathObject containerParent, PathClass classification, String name) {
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        return classification.equals(object.getPathClass())</span>
+<span class="nc bnc" id="L275" title="All 4 branches missed.">                &amp;&amp; name.equals(object.getName())</span>
+                &amp;&amp; object instanceof PathAnnotationObject
+<span class="nc bnc" id="L277" title="All 2 branches missed.">                &amp;&amp; containerParent.getROI().getGeometry().equals(object.getROI().getGeometry());</span>
+    }
+
+    /**
+     * Creates a duplicate child annotation to be used as container
+     * @param containerParent the annotation to use as a model for the container
+     * @param overwrite if true, deletes all previously created containers, if any
+     * @return the new container, as child of &lt;code&gt;containerParent&lt;/code&gt;
+     */
+    protected PathAnnotationObject createContainer(PathAnnotationObject containerParent, boolean overwrite) {
+<span class="nc" id="L287">        String name = this.getContainersName();</span>
+<span class="nc" id="L288">        PathClass classification = this.getContainersPathClass();</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if(overwrite) {</span>
+<span class="nc" id="L290">            Optional&lt;PathAnnotationObject&gt; oldContainer = containerParent.getChildObjects().stream()</span>
+<span class="nc" id="L291">                    .filter(o -&gt; isDerivedContainer(o, containerParent, classification, name))</span>
+<span class="nc" id="L292">                    .map(o -&gt; (PathAnnotationObject) o)</span>
+<span class="nc" id="L293">                    .findFirst(); // TODO: overwring the first one without warning may cause disruptive behaviours</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            if (oldContainer.isPresent()) {</span>
+<span class="nc" id="L295">                PathAnnotationObject container = oldContainer.get();</span>
+<span class="nc" id="L296">                this.hierarchy.removeObjects(container.getChildObjects(), false);</span>
+<span class="nc" id="L297">                return container;</span>
+            }
+        }
+<span class="nc" id="L300">        PathAnnotationObject duplicate = (PathAnnotationObject) PathObjectTools.transformObject(containerParent,null, true, true);</span>
+<span class="nc" id="L301">        duplicate.setName(name);</span>
+<span class="nc" id="L302">        duplicate.setPathClass(classification);</span>
+<span class="nc" id="L303">        this.hierarchy.addObjectBelowParent(containerParent, duplicate, true);</span>
+<span class="nc" id="L304">        duplicate.setLocked(true);</span>
+<span class="nc" id="L305">        return duplicate;</span>
+    }
+
+    /**
+     * applies a list of classifiers in sequence to the detections of the instance kind.
+     * The order of the classifiers is important. If they work on overlapping annotations, the intersection is classified using the latter classifier.
+     * &lt;br&gt;
+     * If a classifier's output is not compatible with the instance, the corresponding {@link PartialClassifier} will be skipped.
+     * @param classifiers the sequence of partial classifiers to apply
+     * @param imageData the imageData used by the classifiers
+     * @see AbstractDetections#getDetectionsPathClasses()
+     * @see AbstractDetections#getDiscardedDetectionsPathClass()
+     */
+    public &lt;T&gt; void applyClassifiers(List&lt;PartialClassifier&lt;T&gt;&gt; classifiers, ImageData&lt;T&gt; imageData) {
+<span class="nc" id="L319">        classifiers = removeUselessClassifiers(classifiers);</span>
+<span class="nc" id="L320">        List&lt;PathDetectionObject&gt; cells = new ArrayList&lt;&gt;();</span>
+        try {
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            for (PartialClassifier&lt;T&gt; partialClassifier : classifiers) {</span>
+<span class="nc" id="L323">                ObjectClassifier&lt;T&gt; classifier = partialClassifier.classifier();</span>
+<span class="nc" id="L324">                Collection&lt;PathAnnotationObject&gt; toClassify = partialClassifier.annotations();</span>
+                try {
+<span class="nc" id="L326">                    cells.addAll(this.classifyInside(classifier, toClassify, imageData));</span>
+<span class="nc" id="L327">                } catch (IncompatibleClassifier e) {</span>
+<span class="nc" id="L328">                    BraiAnExtension.logger.warn(&quot;Skipping {}...\n\t{}&quot;, classifier, e.getMessage().replace(&quot;\n&quot;, &quot;\n\t&quot;));</span>
+<span class="nc" id="L329">                    return;</span>
+<span class="nc" id="L330">                }</span>
+<span class="nc" id="L331">            }</span>
+<span class="nc" id="L332">            this.bbh = new BoundingBoxHierarchy(cells, BBH_MAX_DEPTH);</span>
+<span class="nc" id="L333">        } catch (NoCellContainersFoundException e) {</span>
+<span class="nc" id="L334">            BraiAnExtension.getLogger().warn(&quot;No containers of '{}' detections found. No classification made&quot;, getContainersName());</span>
+<span class="nc" id="L335">        }</span>
+<span class="nc" id="L336">    }</span>
+
+    private static &lt;T&gt; List&lt;PartialClassifier&lt;T&gt;&gt; removeUselessClassifiers(List&lt;PartialClassifier&lt;T&gt;&gt; partialClassifiers) {
+<span class="nc" id="L339">        int lastFullClassifier = -1;</span>
+<span class="nc" id="L340">        int n = partialClassifiers.size();</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        for (int i = n-1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L342">            lastFullClassifier = i;</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            if (partialClassifiers.get(i).coversFullImage())</span>
+<span class="nc" id="L344">                break;</span>
+        }
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        if(lastFullClassifier &gt; 0)</span>
+<span class="nc" id="L347">            partialClassifiers = partialClassifiers.subList(lastFullClassifier, n);</span>
+<span class="nc" id="L348">        return partialClassifiers;</span>
+    }
+
+    private &lt;T&gt; List&lt;PathDetectionObject&gt; classifyInside(ObjectClassifier&lt;T&gt; classifier,
+                                                         Collection&lt;PathAnnotationObject&gt; annotations,
+                                                         ImageData&lt;T&gt; imageData) throws IncompatibleClassifier, NoCellContainersFoundException {
+<span class="nc bnc" id="L354" title="All 4 branches missed.">        if(!this.isCompatibleClassifier(classifier) &amp;&amp;</span>
+                !(classifier instanceof SingleClassifier &amp;&amp;
+<span class="nc bnc" id="L356" title="All 2 branches missed.">                        this.getDetectionsPathClasses().contains(classifier.getPathClasses().toArray()[0])))</span>
+<span class="nc" id="L357">            throw new IncompatibleClassifier(classifier.getPathClasses(), this.getDetectionsPathClasses(), this.getDiscardedDetectionsPathClass());</span>
+        List&lt;PathDetectionObject&gt; cells;
+<span class="nc bnc" id="L359" title="All 2 branches missed.">        if(annotations == null)</span>
+            // get ALL detections. Even those there were discarded. Can't use this.toStream()
+<span class="nc" id="L361">            cells = this.getContainersDetections(true); // throws NoCellContainersFoundException</span>
+        else
+<span class="nc" id="L363">            cells = annotations.stream()</span>
+<span class="nc" id="L364">                    .flatMap(a -&gt; AbstractDetections.getDetectionsInside(a, this.hierarchy))</span>
+<span class="nc" id="L365">                    .filter(detection -&gt; this.hasDetectionClass(detection, true))</span>
+<span class="nc" id="L366">                    .toList();</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        if (classifier.classifyObjects(imageData, cells, true) &gt; 0)</span>
+<span class="nc" id="L368">            imageData.getHierarchy().fireObjectClassificationsChangedEvent(classifier, cells);</span>
+<span class="nc" id="L369">        PathClass discardedPC = this.getDiscardedDetectionsPathClass();</span>
+<span class="nc" id="L370">        BraiAn.populatePathClassGUI(discardedPC);</span>
+<span class="nc" id="L371">        return cells.stream().filter(d -&gt; this.hasDetectionClass(d, false)).toList();</span>
+    }
+
+    protected &lt;T&gt; boolean isCompatibleClassifier(ObjectClassifier&lt;T&gt; classifier) {
+<span class="nc" id="L375">        Collection&lt;PathClass&gt; outputClasses = classifier.getPathClasses();</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if(outputClasses.size() != 2)</span>
+<span class="nc" id="L377">            return false;</span>
+<span class="nc bnc" id="L378" title="All 2 branches missed.">        return outputClasses.containsAll(this.getDetectionsPathClasses()) &amp;&amp;</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">                outputClasses.contains(this.getDiscardedDetectionsPathClass());</span>
+    }
+
+    /**
+     * Check whether two {@code AbstractDetections} are compatible.
+     * They are compatible if they work on the same hierarchy, they have the same {@link #getId()},
+     * they work on the same type of containers and on the same {@link #getDetectionsPathClasses()}
+     * @param other an instance of the detections to check against the current one
+     * @return true, if compatible. False otherwise.
+     * @see #getId()
+     * @see #getContainersName()
+     * @see #getDetectionsPathClasses()
+     */
+    public boolean isCompatibleWith(AbstractDetections other) {
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        return other != null</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">                &amp;&amp; this.id.equals(other.id)</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                &amp;&amp; this.getContainersName().equals(other.getContainersName())</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">                &amp;&amp; this.hierarchy.equals(other.hierarchy)</span>
+<span class="nc bnc" id="L397" title="All 2 branches missed.">                &amp;&amp; new HashSet&lt;&gt;(this.detectionClasses).equals(new HashSet&lt;&gt;(other.detectionClasses));</span>
+    }
+
+    /**
+     * Two detection objects are functionally the same if they are compatible with each other and they have the same containers
+     * @param obj
+     * @return True, if they are functionally the same. False otherwise
+     * @see #isCompatibleWith(AbstractDetections)
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L408" title="All 4 branches missed.">        if (obj == null || !this.getClass().equals(obj.getClass()))</span>
+<span class="nc" id="L409">            return false;</span>
+<span class="nc" id="L410">        AbstractDetections other = (AbstractDetections) obj;</span>
+<span class="nc bnc" id="L411" title="All 4 branches missed.">        return this.isCompatibleWith(other) &amp;&amp; new HashSet&lt;&gt;(this.containers).equals(new HashSet&lt;&gt;(other.containers));</span>
+    }
+}
+
+class IncompatibleClassifier extends Exception {
+    public IncompatibleClassifier(Collection&lt;PathClass&gt; classifierOutputs, List&lt;PathClass&gt; detectionClasses, PathClass discardedChannelClass) {
+<span class="nc" id="L417">        super(&quot;The provided classifier is incompatibile.\n&quot; +</span>
+<span class="nc" id="L418">                &quot;Expected: [&quot;+ BraiAn.join(detectionClasses, &quot;, &quot;)+&quot;, &quot;+discardedChannelClass+&quot;]\n&quot; +</span>
+<span class="nc" id="L419">                &quot;Got: &quot;+classifierOutputs.toString());</span>
+<span class="nc" id="L420">    }</span>
+}
+
+class IncompatibleDetections extends Exception {
+    public IncompatibleDetections(AbstractDetections d1, AbstractDetections d2) {
+<span class="nc" id="L425">        super(&quot;The provided detections are incompatibile: &quot; + d1 + &quot; and &quot; + d2);</span>
+<span class="nc" id="L426">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BraiAn.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian.utils</a> &gt; <span class="el_source">BraiAn.java</span></div><h1>BraiAn.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian.utils;
+
+import qupath.fx.utils.FXUtils;
+import qupath.lib.gui.QuPathGUI;
+import qupath.lib.objects.classes.PathClass;
+import qupath.lib.projects.Projects;
+
+import java.io.FileNotFoundException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+
+import static qupath.lib.scripting.QP.getProject;
+
+<span class="nc" id="L19">public class BraiAn {</span>
+    public static Optional&lt;Path&gt; resolvePathIfPresent(String fileName) {
+<span class="nc" id="L21">        Path projectPath = Projects.getBaseDirectory(getProject()).toPath();</span>
+<span class="nc" id="L22">        Path projectParentDirectoryPath = projectPath.getParent();</span>
+<span class="nc" id="L23">        Path[] resolutionOrder = {projectPath, projectParentDirectoryPath};</span>
+<span class="nc bnc" id="L24" title="All 2 branches missed.">        for (Path path: resolutionOrder) {</span>
+<span class="nc" id="L25">            Path filePath = path.resolve(fileName);</span>
+<span class="nc bnc" id="L26" title="All 2 branches missed.">            if (Files.exists(filePath))</span>
+<span class="nc" id="L27">                return Optional.of(filePath);</span>
+        }
+<span class="nc" id="L29">        return Optional.empty();</span>
+    }
+
+    /**
+     * It searches for a file accordingly to BraiAn specifics: it first searches it in the project's path;
+     * if it is not present, it searches it in the parent directory, were supposedly other QuPath projects of the
+     * same experiment reside.
+     * @param fileName the name of the file to search accordingly to BraiAn
+     * @return the complete path to &lt;code&gt;fileName&lt;/code&gt;.
+     * @throws FileNotFoundException if no file named &lt;code&gt;fileName&lt;/code&gt; was found.
+     */
+    public static Path resolvePath(String fileName) throws FileNotFoundException {
+<span class="nc" id="L41">        return resolvePathIfPresent(fileName)</span>
+<span class="nc" id="L42">                .orElseThrow(() -&gt; new FileNotFoundException(&quot;Can't find the specified file: '&quot;+fileName+&quot;'&quot;));</span>
+    }
+
+    public static void populatePathClassGUI(PathClass... toAdd) {
+<span class="nc" id="L46">        List&lt;PathClass&gt; visibleClasses = new ArrayList&lt;&gt;(getProject().getPathClasses());</span>
+<span class="nc" id="L47">        List&lt;PathClass&gt; missingClasses = Arrays.stream(toAdd)</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">                .filter(classification -&gt; !visibleClasses.contains(classification))</span>
+<span class="nc" id="L49">                .toList();</span>
+<span class="nc" id="L50">        visibleClasses.addAll(missingClasses);</span>
+<span class="nc" id="L51">        var qupathGUI = QuPathGUI.getInstance();</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (qupathGUI != null)</span>
+<span class="nc" id="L53">            FXUtils.runOnApplicationThread(() -&gt;</span>
+<span class="nc" id="L54">                qupathGUI.getAvailablePathClasses().setAll(visibleClasses)</span>
+            );
+<span class="nc" id="L56">    }</span>
+
+    public static &lt;T&gt; String join(Collection&lt;T&gt; c, String delimiter) {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (c.isEmpty())</span>
+<span class="nc" id="L60">            return &quot;&quot;;</span>
+<span class="nc" id="L61">        StringBuilder classesStr = new StringBuilder();</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        List&lt;T&gt; l = c instanceof List ? (List&lt;T&gt;) c : new ArrayList&lt;&gt;(c);</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        for (int i = 0; i &lt; l.size()-1; i++) {</span>
+<span class="nc" id="L64">            T o = l.get(i);</span>
+<span class="nc" id="L65">            classesStr.append(o).append(delimiter);</span>
+        }
+<span class="nc" id="L67">        classesStr.append(l.get(l.size()-1));</span>
+<span class="nc" id="L68">        return classesStr.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
