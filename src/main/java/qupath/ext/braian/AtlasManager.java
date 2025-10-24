@@ -402,6 +402,7 @@ public class AtlasManager {
         if (this.atlasObject.getChildObjects().isEmpty())
             throw new DisruptedAtlasHierarchy(this.atlasObject);
         if (this.atlasObject.getPathClass() == AtlasManager.EXCLUDE_CLASSIFICATION) {
+            getLogger().error("Detected ontology disruption: the atlas annotation ({}) was excluded without duplication, effectively loosing the name of the atlas.", this.atlasObject);
             for (PathObject root: this.atlasObject.getChildObjects()) {
                 PathObject duplicate = PathObjectTools.transformObject(root, null, true, true);
                 duplicate.setPathClass(AtlasManager.EXCLUDE_CLASSIFICATION);
@@ -420,6 +421,7 @@ public class AtlasManager {
     }
 
     private void fixMistakenlyExcludedRegion(PathObject mistakenlyExcludedRegion, boolean isSplit) {
+        getLogger().warn("Detected ontology disruption: region annotation ({}) was modified. Trying to fix it...", mistakenlyExcludedRegion);
         String regionName;
         if ((regionName = mistakenlyExcludedRegion.getName()) == null)
             throw new RuntimeException("Can't deduce the name for brain region '"+mistakenlyExcludedRegion+"'.");
@@ -435,10 +437,13 @@ public class AtlasManager {
             PathObject duplicate = PathObjectTools.transformObject(mistakenlyExcludedRegion, null, true, true);
             this.hierarchy.addObject(duplicate);
             wrongDuplicates = List.of(duplicate);
+        } else {
+            getLogger().warn("Detected wrong exclusion: region annotation duplicate ({}) found outside the atlas ontology, but not set as '{}'", BraiAn.join(wrongDuplicates, ", "), AtlasManager.EXCLUDE_CLASSIFICATION);
         }
         for (PathObject wrongDuplicate: wrongDuplicates) {
             wrongDuplicate.setPathClass(AtlasManager.EXCLUDE_CLASSIFICATION);
         }
+        getLogger().warn("Fixing ontology disruption: exclude '{}' and set its classification to '{}'", regionName, classification);
         mistakenlyExcludedRegion.setPathClass(classification);
     }
 
