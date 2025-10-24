@@ -29,8 +29,8 @@ import qupath.ext.braian.config.ProjectsConfig
 import static qupath.lib.scripting.QP.*
 
 var imageData = getCurrentImageData()
-// unless explicitly needed, from QuPath 0.6.* avoid calling imageData.getServer(). It makes scripts considerably slower
-var server = imageData.getServer()
+// NOTE unless explicitly needed, from QuPath 0.6.* avoid calling imageData.getServer(). It makes scripts considerably slower
+// var server = imageData.getServer()
 var hierarchy = imageData.getHierarchy()
 var config = ProjectsConfig.read("BraiAn.yml")
 var annotations = config.getAnnotationsForDetections(hierarchy)
