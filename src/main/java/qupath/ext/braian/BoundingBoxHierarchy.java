@@ -29,6 +29,11 @@ class BVHNode implements BoundingBox {
     private final double centroidY;
     private final Rectangle2D.Double bbox;
 
+    /**
+     * Wraps a {@link PathObject} into a leaf node.
+     *
+     * @param po the object to wrap
+     */
     public BVHNode(PathObject po) {
         this.po = po;
         ROI roi = po.getROI();
@@ -37,11 +42,20 @@ class BVHNode implements BoundingBox {
         this.bbox = new Rectangle2D.Double(roi.getBoundsX(), roi.getBoundsY(), roi.getBoundsWidth(), roi.getBoundsHeight());
     }
 
+    /**
+     * @return a stream containing only the wrapped {@link PathObject}
+     */
     @Override
     public Stream<PathObject> toStream() {
         return Stream.of(this.po);
     }
 
+    /**
+     * Checks whether the centroid of this node is inside the specified object.
+     *
+     * @param object the object to test
+     * @return an {@link Optional} containing the wrapped object if overlapping
+     */
     @Override
     public Optional<PathObject> getOverlappingObjectIfPresent(PathObject object) {
         // if ROI.contains() results in being buggy, in the future we could rely on:
@@ -64,16 +78,26 @@ class BVHNode implements BoundingBox {
         return Optional.empty();
     }
 
+    /**
+     * @param other the object to check
+     * @return true if {@code other} is the wrapped object
+     */
     @Override
     public boolean contains(PathObject other) {
         return this.po == other;
     }
 
+    /**
+     * @return the bounding box of the wrapped object
+     */
     @Override
     public Rectangle2D getBox() {
         return this.bbox;
     }
 
+    /**
+     * @return the depth of this node (always 0 for leaves)
+     */
     @Override
     public int getDepth() {
         return 0;
@@ -180,6 +204,10 @@ public class BoundingBoxHierarchy implements BoundingBox {
         return this.getOverlappingObjectIfPresent(object).orElse(null);
     }
 
+    /**
+     * @param object the object to search
+     * @return true if {@code object} is present in the hierarchy
+     */
     @Override
     public boolean contains(PathObject object) {
         if(this.isEmpty()) // if the BBH is empty

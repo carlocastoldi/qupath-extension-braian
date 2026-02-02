@@ -25,6 +25,15 @@ class IllegalChannelName extends RuntimeException {
     }
 }
 
+/**
+ * Utility helper to access and process a named image channel.
+ * <p>
+ * This class bridges QuPath channel metadata and ImageJ processors, and is used to compute
+ * per-channel histograms/statistics and retrieve existing detections.
+ *
+ * @see ChannelHistogram
+ * @see ChannelDetections
+ */
 public class ImageChannelTools {
     private final String name;
     private final ImageData<BufferedImage> imageData;
@@ -149,6 +158,6 @@ public class ImageChannelTools {
      * @see ChannelDetections
      */
     public ChannelDetections getDetections(PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
-        return new ChannelDetections(this, hierarchy);
+        return new ChannelDetections(this, hierarchy, null, null);
     }
 }

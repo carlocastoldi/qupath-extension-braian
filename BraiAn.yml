@@ -10,6 +10,10 @@
 # If a value is not defined in the YAML, BraiAn will apply a default value.
 classForDetections: null                  # DEFAULT: null (i.e. applies BraiAn on the whole image)
                                           #               Class of the annotations in which BraiAn's cell detection analysis is desired
+enableCellDetection: true                 # DEFAULT: true
+                                          #               If false, BraiAn skips cell detection and related classifiers
+enablePixelClassification: false          # DEFAULT: false
+                                          #               If true, BraiAn runs pixel classifiers and exports their measurements per atlas region
 detectionsCheck:
   apply: true                             # DEFAULT: false
                                           #               If set to true, each detection on a channel (different from 'controlChannel') is ascribable to a cell detection in the 'controlChannel'.
@@ -109,3 +113,11 @@ channelDetections:                        # DEFAULT: empty (i.e. BraiAn does not
           - "CTXsp"
           - "OLF"
           - "CA1"
+
+# Pixel classifier parameters
+pixelClassifiers:                         # DEFAULT: empty (i.e. no pixel classifier is applied)
+  # - classifierName: "AF568_pixels"      # DEFAULT: null
+  #                                        #               Name of the classifier's json file (without extension)
+  #                                        #               BraiAn searches it in the project's directory or in its parent directory
+  #   measurementId: "AF568_projections"  # DEFAULT: null
+  #                                        #               Measurement name written to the exported TSV for each atlas region

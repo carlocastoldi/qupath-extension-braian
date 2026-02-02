@@ -7,13 +7,14 @@ package qupath.ext.braian;
 import org.controlsfx.control.action.Action;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.ext.braian.gui.BraiAnDetectDialog;
+import qupath.ext.braian.gui.ExclusionReviewDialog;
+import qupath.ext.braian.runners.AutoExcludeEmptyRegionsRunner;
+import qupath.lib.common.Version;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.actions.ActionTools;
 import qupath.lib.gui.extensions.QuPathExtension;
 import qupath.lib.gui.tools.MenuTools;
-import qupath.lib.objects.PathObject;
-import qupath.lib.objects.hierarchy.PathObjectHierarchy;
-import qupath.lib.scripting.QP;
 
 import java.io.*;
 import java.net.URLDecoder;
@@ -22,6 +23,11 @@ import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+/**
+ * Entry point for the BraiAn QuPath extension.
+ * <p>
+ * This class registers menu items and bundled scripts in the QuPath GUI.
+ */
 public class BraiAnExtension implements QuPathExtension {
 
     private static final String menuPosition = "Extensions>BraiAn";
@@ -37,6 +43,7 @@ public class BraiAnExtension implements QuPathExtension {
 
     /**
      * integrate the extension in QuPath GUI
+     * 
      * @param qupath the istance of QuPath to modify
      */
     @Override
@@ -46,23 +53,41 @@ public class BraiAnExtension implements QuPathExtension {
     }
 
     private void addCommands(QuPathGUI qupath) {
+        var importAction = ActionTools.createAction(
+                () -> {
+                    try {
+                        new BraiAnDetectDialog(qupath, BraiAnDetectDialog.InitialTab.IMPORT).show();
+                    } catch (IllegalStateException e) {
+                        logger.warn("BraiAnDetect GUI not opened: {}", e.getMessage());
+                    }
+                },
+                "Project Preparation");
+
+        var detectionAction = ActionTools.createAction(
+                () -> {
+                    try {
+                        new BraiAnDetectDialog(qupath, BraiAnDetectDialog.InitialTab.DETECTION).show();
+                    } catch (IllegalStateException e) {
+                        logger.warn("BraiAnDetect GUI not opened: {}", e.getMessage());
+                    }
+                },
+                "Cell Detection");
+
         var showExclusions = ActionTools.createAction(
                 () -> {
-                    PathObjectHierarchy hierarchy = QP.getCurrentHierarchy();
-                    if (hierarchy == null) {
-                        logger.error("No image is currently open!");
+                    if (qupath.getProject() == null) {
+                        logger.error("No project is currently open!");
                         return;
                     }
-                    AtlasManager atlas = new AtlasManager(hierarchy);
-                    Set<PathObject> regionsToExcludeSet = atlas.getExcludedBrainRegions();
-                    QP.resetSelection();
-                    QP.selectObjects(regionsToExcludeSet);
+                    var reports = AutoExcludeEmptyRegionsRunner.getExcludedRegionsCurrentProject(qupath);
+                    new ExclusionReviewDialog(qupath, reports).show();
                 },
                 "Show regions currently excluded");
         MenuTools.addMenuItems(
                 qupath.getMenu(BraiAnExtension.menuPosition, true),
-                showExclusions
-        );
+                importAction,
+                detectionAction,
+                showExclusions);
     }
 
     private void addHelpScripts(QuPathGUI qupath) {
@@ -71,17 +96,20 @@ public class BraiAnExtension implements QuPathExtension {
             logger.warn("Could not find the '{}' JAR file!", getClass().getSimpleName());
             return;
         }
-        String[] scripts = listJarDirectory(extensionJar, (dir, file) -> dir.toString().equals("scripts") && file.endsWith(".groovy"));
+        String[] scripts = listJarDirectory(extensionJar,
+                (dir, file) -> dir.toString().equals("scripts") && file.endsWith(".groovy"));
 
-        for(String scriptPath: scripts)
+        for (String scriptPath : scripts)
             try (InputStream stream = getClass().getClassLoader().getResourceAsStream(scriptPath)) {
-                assert stream != null;
+                if (stream == null) {
+                    logger.warn("Missing script resource: {}", scriptPath);
+                    continue;
+                }
                 String scriptName = new File(scriptPath).getName();
                 String script = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
                 MenuTools.addMenuItems(
-                        qupath.getMenu(BraiAnExtension.menuPosition+">Scripts", true),
-                        new Action(scriptName, e -> openScript(qupath, scriptName, script))
-                );
+                        qupath.getMenu(BraiAnExtension.menuPosition + ">Scripts", true),
+                        new Action(scriptName, e -> openScript(qupath, scriptName, script)));
             } catch (Exception e) {
                 logger.error(e.getLocalizedMessage(), e);
             }
@@ -98,7 +126,7 @@ public class BraiAnExtension implements QuPathExtension {
         try (JarFile jar = new JarFile(URLDecoder.decode(jarPath.toString(), StandardCharsets.UTF_8))) {
             internalFiles = jar.entries(); // gives ALL internalFiles in jar
             List<String> selectedResources = new ArrayList<>();
-            while(internalFiles.hasMoreElements()) {
+            while (internalFiles.hasMoreElements()) {
                 String internalPath = internalFiles.nextElement().getName();
                 if (internalPath.endsWith("/"))
                     continue;
@@ -136,5 +164,13 @@ public class BraiAnExtension implements QuPathExtension {
     @Override
     public String getDescription() {
         return "A collection of tools for whole-brain data quantification and extraction";
+    }
+
+    /**
+     * @return the minimum QuPath version required by this extension
+     */
+    @Override
+    public Version getQuPathVersion() {
+        return Version.parse("0.6.0");
     }
 }

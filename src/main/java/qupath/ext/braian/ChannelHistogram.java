@@ -13,6 +13,12 @@ import java.util.stream.IntStream;
 
 import static qupath.ext.braian.BraiAnExtension.logger;
 
+/**
+ * Histogram utilities for a single image channel.
+ * <p>
+ * This class wraps ImageJ histogram/statistics and exposes helpers used for
+ * auto-thresholding and signal coverage estimation.
+ */
 public class ChannelHistogram {
     private static int retrieveBitDepth(ImageStatistics stats) {
         if(stats.histogram16 != null)
@@ -92,10 +98,36 @@ public class ChannelHistogram {
         return this.bitDepth == 16;
     }
 
+    /**
+     * @return the number of bins of the histogram (e.g. 256 for 8-bit, 65536 for 16-bit)
+     */
     public int getMaxValue() {
         if (this.is8bit() || this.is16bit())
             return this.values.length;
         throw new RuntimeException("Unknown maximum value for this histogram");
+    }
+
+    /**
+     * Computes the fraction of pixels at or above a given intensity threshold.
+     *
+     * @param threshold intensity value (0-255 for 8-bit, 0-65535 for 16-bit)
+     * @return coverage as a value between 0.0 and 1.0
+     */
+    public double getCoverageAbove(int threshold) {
+        long total = 0;
+        for (long v : values) {
+            total += v;
+        }
+        if (total <= 0) {
+            return 0.0;
+        }
+
+        int start = Math.max(0, Math.min(threshold, values.length));
+        long above = 0;
+        for (int i = start; i < values.length; i++) {
+            above += values[i];
+        }
+        return (double) above / (double) total;
     }
 
     /**
