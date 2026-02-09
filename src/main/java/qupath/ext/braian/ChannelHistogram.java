@@ -99,6 +99,68 @@ public class ChannelHistogram {
     }
 
     /**
+     * Computes the Otsu threshold for the current histogram.
+     *
+     * @return threshold index (in the same intensity scale as this histogram)
+     */
+    public int otsuThreshold() {
+        return otsuThreshold(this.values);
+    }
+
+    static int otsuThreshold(long[] histogram) {
+        if (histogram == null || histogram.length == 0)
+            return 0;
+
+        long total = 0;
+        double sum = 0;
+        for (int i = 0; i < histogram.length; i++) {
+            long h = histogram[i];
+            if (h <= 0)
+                continue;
+            total += h;
+            sum += (double) i * (double) h;
+        }
+        if (total == 0)
+            return 0;
+
+        long wB = 0;
+        double sumB = 0;
+        double maxBetween = -1.0;
+        long thresholdSum = 0;
+        int thresholdCount = 0;
+
+        for (int i = 0; i < histogram.length; i++) {
+            long h = histogram[i];
+            if (h > 0) {
+                wB += h;
+                sumB += (double) i * (double) h;
+            }
+
+            long wF = total - wB;
+            if (wB == 0 || wF == 0)
+                continue;
+
+            double mB = sumB / (double) wB;
+            double mF = (sum - sumB) / (double) wF;
+            double between = (double) wB * (double) wF * (mB - mF) * (mB - mF);
+
+            if (between > maxBetween) {
+                maxBetween = between;
+                thresholdSum = i;
+                thresholdCount = 1;
+            } else if (between == maxBetween) {
+                thresholdSum += i;
+                thresholdCount++;
+            }
+        }
+
+        if (thresholdCount <= 0)
+            return 0;
+
+        return (int) Math.round((double) thresholdSum / (double) thresholdCount);
+    }
+
+    /**
      * Smooths the ChannelHistogram and find the color values that appear the most.
      * <p>
      * It applies {@link #findHistogramPeaks(int, double)} with <code>windowSize=15</code>

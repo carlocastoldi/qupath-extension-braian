@@ -25,6 +25,32 @@ import static org.junit.jupiter.api.Assertions.*;
 public class ChannelHistogramTest {
 
     @Test
+    void otsuThreshold_shouldFallBetweenBimodalPeaks_8bit() {
+        long[] hist = new long[256];
+        hist[20] = 10_000;
+        hist[200] = 10_000;
+
+        int t = ChannelHistogram.otsuThreshold(hist);
+        assertTrue(t > 20 && t < 200, "Expected threshold between peaks, got " + t);
+    }
+
+    @Test
+    void otsuThreshold_shouldFallBetweenBimodalPeaks_16bit() {
+        long[] hist = new long[65536];
+        hist[1_000] = 10_000;
+        hist[60_000] = 10_000;
+
+        int t = ChannelHistogram.otsuThreshold(hist);
+        assertTrue(t > 1_000 && t < 60_000, "Expected threshold between peaks, got " + t);
+    }
+
+    @Test
+    void otsuThreshold_allZeroHistogram_returnsZero() {
+        long[] hist = new long[256];
+        assertEquals(0, ChannelHistogram.otsuThreshold(hist));
+    }
+
+    @Test
         // test behavior for signal without local maxima
     void constant() {
         // PREPARE
