@@ -16,10 +16,20 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Minimal object classifier that assigns a single {@link PathClass} to all input detections.
+ *
+ * @param <T> image pixel type used by QuPath
+ */
 public class SingleClassifier<T> extends AbstractObjectClassifier<T> {
     private final PathClass pathClass;
     private final List<PathClass> pathClasses;
 
+    /**
+     * Creates a classifier that assigns (or merges) the provided class.
+     *
+     * @param pathClass class to apply to detections
+     */
     public SingleClassifier(PathClass pathClass) {
         super(PathObjectFilter.DETECTIONS_ALL);
         this.pathClass = pathClass;

@@ -22,33 +22,54 @@ import java.util.List;
 
 import static qupath.lib.scripting.QP.getProject;
 
+/**
+ * Configuration for loading and applying one object classifier on a channel.
+ */
 public class ChannelClassifierConfig {
     private String channel;
     private String name;
     private List<String> annotationsToClassify; // names of the annotations to classify
 
+    /**
+     * @return channel name associated with this classifier configuration
+     */
     public String getChannel() {
         return this.channel;
     }
 
+    /**
+     * @param channel channel name associated with this classifier configuration
+     */
     public void setChannel(String channel) {
         if (channel == null)
             throw new IllegalArgumentException("'channel' must be non-null value.");
         this.channel = channel;
     }
 
+    /**
+     * @return classifier identifier from YAML (or {@code ALL})
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * @param name classifier identifier from YAML (or {@code ALL})
+     */
     public void setName(String name) {
         this.name = name;
     }
 
+    /**
+     * @return optional annotation-name filter restricting where classifier is applied
+     */
     public List<String> getAnnotationsToClassify() {
         return annotationsToClassify;
     }
 
+    /**
+     * @param annotationsToClassify optional annotation-name filter restricting where classifier is applied
+     */
     public void setAnnotationsToClassify(List<String> annotationsToClassify) {
         this.annotationsToClassify = annotationsToClassify;
     }

@@ -13,7 +13,17 @@ import java.util.stream.IntStream;
 
 import static qupath.ext.braian.BraiAnExtension.getLogger;
 
+/**
+ * Configuration model for QuPath watershed cell detection parameters.
+ */
 public class WatershedCellDetectionConfig {
+    /**
+     * Computes an automatic threshold for a channel using histogram peak detection.
+     *
+     * @param channel image channel wrapper
+     * @param params histogram-based threshold configuration
+     * @return automatically selected threshold value
+     */
     public static int findThreshold(ImageChannelTools channel, AutoThresholdParmameters params) {
         int windowSize = params.getSmoothWindowSize();
         ChannelHistogram histogram;
@@ -33,10 +43,12 @@ public class WatershedCellDetectionConfig {
     }
 
     /**
-     * @param histogram
-     * @param peaks
-     * @param nth
-     * @param windowSize
+     * Selects the n-th valid peak while ignoring edge artifacts introduced by smoothing.
+     *
+     * @param histogram source histogram
+     * @param peaks detected peak indices
+     * @param nth zero-based peak index to select
+     * @param windowSize smoothing window size used before peak detection
      * @return the n-th peak of the histogram excluding the peaks that are not trust-worthy (i.e. those at the beginning and end of the smoothed histogram)
      */
     private static int getNthValidPeak(ChannelHistogram histogram, int[] peaks, int nth, int windowSize) {
@@ -69,6 +81,12 @@ public class WatershedCellDetectionConfig {
     private boolean smoothBoundaries = true;
     private boolean makeMeasurements = true;
 
+    /**
+     * Builds the parameter map consumed by QuPath watershed detection command.
+     *
+     * @param channel channel used for detection and optional auto-thresholding
+     * @return immutable-style map of parameter names and values
+     */
     public Map<String,?> build(ImageChannelTools channel) {
         this.setDetectionImage(channel.getName());
         if (this.histogramThreshold != null)

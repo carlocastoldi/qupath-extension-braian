@@ -16,7 +16,16 @@ import java.util.*;
 
 import static qupath.lib.scripting.QP.getProject;
 
+/**
+ * Utility helpers shared across BraiAn scripts, config loading, and UI workflows.
+ */
 public class BraiAn {
+    /**
+     * Resolves a file by checking project directory first, then parent directory.
+     *
+     * @param fileName file name to resolve
+     * @return optional resolved path if file exists
+     */
     public static Optional<Path> resolvePathIfPresent(String fileName) {
         Path projectPath = Projects.getBaseDirectory(getProject()).toPath();
         Path projectParentDirectoryPath = projectPath.getParent();
@@ -42,6 +51,11 @@ public class BraiAn {
                 .orElseThrow(() -> new FileNotFoundException("Can't find the specified file: '"+fileName+"'"));
     }
 
+    /**
+     * Ensures custom {@link PathClass} entries are visible in the QuPath class list UI.
+     *
+     * @param toAdd classes to add when missing
+     */
     public static void populatePathClassGUI(PathClass... toAdd) {
         List<PathClass> visibleClasses = new ArrayList<>(getProject().getPathClasses());
         List<PathClass> missingClasses = Arrays.stream(toAdd)
@@ -55,6 +69,14 @@ public class BraiAn {
             );
     }
 
+    /**
+     * Joins any collection into a delimiter-separated string.
+     *
+     * @param c collection to stringify
+     * @param delimiter separator between elements
+     * @return joined string, or empty string for empty input
+     * @param <T> element type
+     */
     public static <T> String join(Collection<T> c, String delimiter) {
         if (c.isEmpty())
             return "";

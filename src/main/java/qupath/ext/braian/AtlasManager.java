@@ -53,9 +53,24 @@ class ExclusionMistakeException extends RuntimeException {
  * This class helps to manage and exporting results for each brain region. It works closely with ABBA's QuPath extension.
  */
 public class AtlasManager {
+    /**
+     * Micrometer symbol used for exported measurement headings.
+     */
     public final static String um = GeneralTools.micrometerSymbol();
+
+    /**
+     * Class used for annotations that should be excluded from downstream analysis.
+     */
     public final static PathClass EXCLUDE_CLASSIFICATION = PathClass.fromString("Exclude");
+
+    /**
+     * Class assigned by ABBA to left hemisphere regions.
+     */
     public final static PathClass ABBA_LEFT = PathClass.fromString("Left");
+
+    /**
+     * Class assigned by ABBA to right hemisphere regions.
+     */
     public final static PathClass ABBA_RIGHT = PathClass.fromString("Right");
 
     /**

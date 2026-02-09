@@ -13,6 +13,9 @@ import java.util.stream.IntStream;
 
 import static qupath.ext.braian.BraiAnExtension.logger;
 
+/**
+ * Histogram wrapper with helper methods for smoothing, peak detection, and threshold support.
+ */
 public class ChannelHistogram {
     private static int retrieveBitDepth(ImageStatistics stats) {
         if(stats.histogram16 != null)
@@ -92,6 +95,9 @@ public class ChannelHistogram {
         return this.bitDepth == 16;
     }
 
+    /**
+     * @return maximum representable intensity value index for this histogram
+     */
     public int getMaxValue() {
         if (this.is8bit() || this.is16bit())
             return this.values.length;

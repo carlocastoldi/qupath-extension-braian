@@ -15,6 +15,9 @@ import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+/**
+ * Common contract for nodes used in the bounding-volume hierarchy implementation.
+ */
 interface BoundingBox {
     Rectangle2D getBox();
     int getDepth();
@@ -23,6 +26,9 @@ interface BoundingBox {
     boolean contains(PathObject object);
 }
 
+/**
+ * Leaf node storing one {@link PathObject} and its precomputed geometry bounds.
+ */
 class BVHNode implements BoundingBox {
     private final PathObject po;
     private final double centroidX;

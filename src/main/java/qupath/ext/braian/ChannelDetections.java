@@ -18,6 +18,9 @@ import java.util.*;
  * on a given image channel. It does so by leveraging {@link AbstractDetections} interface
  */
 public class ChannelDetections extends AbstractDetections {
+    /**
+     * Name used for synthetic full-image annotation that hosts detections.
+     */
     public static final String FULL_IMAGE_DETECTIONS_NAME = "AllDetections";
 
     /**
@@ -40,6 +43,12 @@ public class ChannelDetections extends AbstractDetections {
         }
     }
 
+    /**
+     * Creates the base classification label used for detections from one channel.
+     *
+     * @param channelName channel name
+     * @return path class with same name as channel
+     */
     public static PathClass createClassification(String channelName) {
         return PathClass.fromString(channelName);
     }

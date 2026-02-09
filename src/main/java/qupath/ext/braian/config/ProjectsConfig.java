@@ -55,6 +55,9 @@ public class ProjectsConfig {
     private DetectionsCheckConfig detectionsCheck = new DetectionsCheckConfig();
     private List<ChannelDetectionsConfig> channelDetections = List.of();
 
+    /**
+     * @return optional class name used to select annotations for cell detection
+     */
     public String getClassForDetections() {
         return classForDetections;
     }
@@ -78,14 +81,23 @@ public class ProjectsConfig {
                 .toList();
     }
 
+    /**
+     * @param classForDetections optional class name used to select annotations for cell detection
+     */
     public void setClassForDetections(String classForDetections) {
         this.classForDetections = classForDetections;
     }
 
+    /**
+     * @return overlap-check configuration block
+     */
     public DetectionsCheckConfig getDetectionsCheck() {
         return detectionsCheck;
     }
 
+    /**
+     * @param detectionsCheck overlap-check configuration block
+     */
     public void setDetectionsCheck(DetectionsCheckConfig detectionsCheck) {
         this.detectionsCheck = detectionsCheck;
     }
@@ -104,10 +116,16 @@ public class ProjectsConfig {
         return Optional.of(name);
     }
 
+    /**
+     * @return per-channel detection configuration list
+     */
     public List<ChannelDetectionsConfig> getChannelDetections() {
         return channelDetections;
     }
 
+    /**
+     * @param channelDetections per-channel detection configuration list
+     */
     public void setChannelDetections(List<ChannelDetectionsConfig> channelDetections) {
         this.channelDetections = channelDetections;
     }
