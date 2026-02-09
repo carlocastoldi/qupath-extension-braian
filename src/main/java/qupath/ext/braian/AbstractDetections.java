@@ -7,10 +7,12 @@ package qupath.ext.braian;
 import org.locationtech.jts.geom.Geometry;
 import qupath.ext.braian.utils.BraiAn;
 import qupath.lib.classifiers.object.ObjectClassifier;
+import qupath.lib.gui.QuPathGUI;
 import qupath.lib.images.ImageData;
 import qupath.lib.objects.*;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+import qupath.lib.projects.Project;
 import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.GeometryTools;
 import qupath.lib.roi.interfaces.ROI;
@@ -58,6 +60,8 @@ public abstract class AbstractDetections {
     private final String id;
     private final PathObjectHierarchy hierarchy;
     private final List<PathClass> detectionClasses;
+    private final Project<?> project;
+    private final QuPathGUI qupath;
     private List<PathAnnotationObject> containers = new ArrayList<>();
     private BoundingBoxHierarchy bbh;
 
@@ -71,12 +75,19 @@ public abstract class AbstractDetections {
      * @see #getContainersName()
      * @see #getContainersPathClass()
      */
-    public AbstractDetections(String id, Collection<PathClass> detectionClasses, PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
+    public AbstractDetections(String id,
+                              Collection<PathClass> detectionClasses,
+                              PathObjectHierarchy hierarchy,
+                              Project<?> project,
+                              QuPathGUI qupath) throws NoCellContainersFoundException {
         this.hierarchy = hierarchy;
         this.id = id;
         this.detectionClasses = detectionClasses.stream().toList();
-        for (PathClass classification: this.detectionClasses)
-            BraiAn.populatePathClassGUI(classification);
+        this.project = project;
+        this.qupath = qupath;
+        if (project != null) {
+            BraiAn.populatePathClassGUI(project, qupath, this.detectionClasses.toArray(new PathClass[0]));
+        }
         this.fireUpdate();
     }
 
@@ -367,7 +378,7 @@ public abstract class AbstractDetections {
         if (classifier.classifyObjects(imageData, cells, true) > 0)
             imageData.getHierarchy().fireObjectClassificationsChangedEvent(classifier, cells);
         PathClass discardedPC = this.getDiscardedDetectionsPathClass();
-        BraiAn.populatePathClassGUI(discardedPC);
+        BraiAn.populatePathClassGUI(project, qupath, discardedPC);
         return cells.stream().filter(d -> this.hasDetectionClass(d, false)).toList();
     }
 

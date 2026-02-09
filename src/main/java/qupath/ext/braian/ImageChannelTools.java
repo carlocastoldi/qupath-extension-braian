@@ -149,6 +149,6 @@ public class ImageChannelTools {
      * @see ChannelDetections
      */
     public ChannelDetections getDetections(PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
-        return new ChannelDetections(this, hierarchy);
+        return new ChannelDetections(this, hierarchy, null, null);
     }
 }

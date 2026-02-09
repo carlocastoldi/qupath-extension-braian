@@ -9,6 +9,8 @@ import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObjects;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+import qupath.lib.gui.QuPathGUI;
+import qupath.lib.projects.Project;
 import qupath.lib.roi.interfaces.ROI;
 
 import java.util.Collection;
@@ -72,7 +74,16 @@ public class OverlappingDetections extends AbstractDetections {
     public OverlappingDetections(AbstractDetections control,
                                  Collection<AbstractDetections> others,
                                  boolean compute, PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
-        super(control.getId(), getAllPossibleOverlappingClassifications(control, others), hierarchy);
+        this(control, others, compute, hierarchy, null, null);
+    }
+
+    public OverlappingDetections(AbstractDetections control,
+                                 Collection<AbstractDetections> others,
+                                 boolean compute,
+                                 PathObjectHierarchy hierarchy,
+                                 Project<?> project,
+                                 QuPathGUI qupath) throws NoCellContainersFoundException {
+        super(control.getId(), getAllPossibleOverlappingClassifications(control, others), hierarchy, project, qupath);
         if (!compute)
             return;
         this.overlap(control, others);
@@ -89,7 +100,15 @@ public class OverlappingDetections extends AbstractDetections {
     public OverlappingDetections(AbstractDetections control,
                                  Collection<AbstractDetections> others,
                                  PathObjectHierarchy hierarchy) throws NoCellContainersFoundException {
-        this(control, others, false, hierarchy);
+        this(control, others, false, hierarchy, null, null);
+    }
+
+    public OverlappingDetections(AbstractDetections control,
+                                 Collection<AbstractDetections> others,
+                                 PathObjectHierarchy hierarchy,
+                                 Project<?> project,
+                                 QuPathGUI qupath) throws NoCellContainersFoundException {
+        this(control, others, false, hierarchy, project, qupath);
     }
 
     @Override

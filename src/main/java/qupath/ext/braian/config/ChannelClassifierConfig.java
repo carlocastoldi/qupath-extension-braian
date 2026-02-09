@@ -14,13 +14,12 @@ import qupath.lib.io.UriResource;
 import qupath.lib.io.UriUpdater;
 import qupath.lib.objects.PathAnnotationObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+import qupath.lib.projects.Project;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
-
-import static qupath.lib.scripting.QP.getProject;
 
 public class ChannelClassifierConfig {
     private String channel;
@@ -63,10 +62,10 @@ public class ChannelClassifierConfig {
      * @throws IOException if any problem raises when reading the JSON file, supposedly corresponding to a QuPath
      * object classifier.
      */
-    public <T> ObjectClassifier<T> loadClassifier() throws IOException {
+    public <T> ObjectClassifier<T> loadClassifier(Project<?> project) throws IOException {
         if (this.getName().equalsIgnoreCase("all"))
             return new SingleClassifier<>(ChannelDetections.createClassification(this.channel));
-        Path classifierPath = BraiAn.resolvePath(this.getName()+".json");
+        Path classifierPath = BraiAn.resolvePath(project, this.getName() + ".json");
         // inspired by QP.loadObjectClassifier()
         ObjectClassifier<T> classifier = null;
         Exception exception = null;
@@ -78,8 +77,8 @@ public class ChannelClassifierConfig {
             throw new IOException("Unable to find object classifier " + classifierPath, exception);
 
         // Try to fix URIs, if we can
-        if (classifier instanceof UriResource)
-            UriUpdater.fixUris((UriResource)classifier, getProject());
+        if (classifier instanceof UriResource && project != null)
+            UriUpdater.fixUris((UriResource) classifier, project);
 
         return classifier;
     }
@@ -107,8 +106,8 @@ public class ChannelClassifierConfig {
      * @see ChannelClassifierConfig#loadClassifier()
      * @see ChannelClassifierConfig#getAnnotationsToClassify()
      */
-    public <T> PartialClassifier<T> toPartialClassifier(PathObjectHierarchy hierarchy) throws IOException {
-        ObjectClassifier<T> classifier = this.loadClassifier();
+    public <T> PartialClassifier<T> toPartialClassifier(PathObjectHierarchy hierarchy, Project<?> project) throws IOException {
+        ObjectClassifier<T> classifier = this.loadClassifier(project);
         return new PartialClassifier<>(classifier, this.getAnnotationsToClassify(hierarchy));
     }
 }
