@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChannelHistogram.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian</a> &gt; <span class="el_source">ChannelHistogram.java</span></div><h1>ChannelHistogram.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian;
+
+import ij.process.ImageProcessor;
+import ij.process.ImageStatistics;
+
+import java.util.*;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+
+import static qupath.ext.braian.BraiAnExtension.logger;
+
+public class ChannelHistogram {
+    private static int retrieveBitDepth(ImageStatistics stats) {
+<span class="nc bnc" id="L18" title="All 2 branches missed.">        if(stats.histogram16 != null)</span>
+<span class="nc" id="L19">            return 16;</span>
+        else
+<span class="nc" id="L21">            return 8;</span>
+    }
+
+    private static long[] getLongHistogram(ImageStatistics stats) {
+<span class="nc bnc" id="L25" title="All 2 branches missed.">        if(stats.histogram16 != null)</span>
+<span class="nc" id="L26">            return Arrays.stream(stats.histogram16).asLongStream().toArray();</span>
+        else
+<span class="nc" id="L28">            return stats.getHistogram();</span>
+    }
+
+    private final String channelName;
+    private final int bitDepth;
+    private final long[] values;
+
+<span class="nc" id="L35">    private ChannelHistogram(String channelName, int bitDepth, long[] histogram) {</span>
+<span class="nc" id="L36">        this.channelName = channelName;</span>
+<span class="nc" id="L37">        this.bitDepth = bitDepth;</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        if(bitDepth == 16)</span>
+<span class="nc" id="L39">            this.values = new long[65536];</span>
+        else
+<span class="nc" id="L41">            this.values = new long[256];</span>
+        // this way, if histogram is shorter than bitDepth, it fills the rest of the values with zeros.
+        // see https://forum.image.sc/t/braian-qupath-scripting-error/108774
+<span class="nc" id="L44">        System.arraycopy(histogram, 0, this.values, 0, histogram.length);</span>
+<span class="nc" id="L45">    }</span>
+
+    /**
+     * Constructs the channel histogram from an ImageJ image.
+     * @param channelName the name of the QuPath channel associated to this histogram
+     * @param image the processor used by ImageJ to represent a given image channel
+     */
+    public ChannelHistogram(String channelName, ImageProcessor image) {
+<span class="nc" id="L53">        this(channelName, image.getBitDepth(), getLongHistogram(image.getStats()));</span>
+<span class="nc" id="L54">    }</span>
+
+    /**
+     * Constructs the channel histogram from the {@link ImageStatistics} object
+     * @param channelName the name of the QuPath channel associated to this histogram
+     * @param stats the statistics representing a given image channel
+     * @see ChannelHistogram(String, ImageProcessor)
+     */
+    @Deprecated(since = &quot;1.0.4&quot;)
+    public ChannelHistogram(String channelName, ImageStatistics stats) {
+<span class="nc" id="L64">        this(channelName, retrieveBitDepth(stats), getLongHistogram(stats));</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * @return the bit depth of the image on which the histogram was computed
+     */
+    public int getBitDepth() {
+<span class="nc" id="L71">        return this.bitDepth;</span>
+    }
+
+    /**
+     * @return the name of the channel from which this histogram was built
+     */
+    public String getChannelName() {
+<span class="nc" id="L78">        return this.channelName;</span>
+    }
+
+    /**
+     * @return true if the current histogram is built from a 8-bit image
+     */
+    public boolean is8bit() {
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        return this.bitDepth == 8;</span>
+    }
+
+    /**
+     * @return true if the current histogram is built from a 16-bit image
+     */
+    public boolean is16bit() {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        return this.bitDepth == 16;</span>
+    }
+
+    public int getMaxValue() {
+<span class="nc bnc" id="L96" title="All 4 branches missed.">        if (this.is8bit() || this.is16bit())</span>
+<span class="nc" id="L97">            return this.values.length;</span>
+<span class="nc" id="L98">        throw new RuntimeException(&quot;Unknown maximum value for this histogram&quot;);</span>
+    }
+
+    /**
+     * Smooths the ChannelHistogram and find the color values that appear the most.
+     * &lt;p&gt;
+     * It applies {@link #findHistogramPeaks(int, double)} with &lt;code&gt;windowSize=15&lt;/code&gt;
+     * and &lt;code&gt;prominence=100&lt;/code&gt;
+     * @return an array of the color values
+     */
+    public int[] findHistogramPeaks() {
+<span class="nc" id="L109">        return findHistogramPeaks(15, 100);</span>
+    }
+
+    /**
+     * Smooths the ChannelHistogram and find the color values that appear the most
+     * @param windowSize the size of the kernel used for smoothing the histogram
+     * @param prominence the threshold used to define whether a local maximum is a peak or not
+     * @return an array of the color values
+     * @see #findPeaks(double[], double)
+     * @see #zeroPhaseFilter(double[], double[])
+     */
+    public int[] findHistogramPeaks(int windowSize, double prominence) {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (windowSize%2 == 0)</span>
+<span class="nc" id="L122">            logger.warn(&quot;For better results, choose a window of odd size!&quot;);</span>
+        // movingAvg is a moving average linear digital filter
+<span class="nc" id="L124">        double[] movingAvg = new double[windowSize];</span>
+<span class="nc" id="L125">        Arrays.fill(movingAvg, (double) 1/windowSize);</span>
+<span class="nc" id="L126">        double[] hist = Arrays.stream(this.values).asDoubleStream().toArray();</span>
+<span class="nc" id="L127">        double[] smoothed = zeroPhaseFilter(movingAvg, hist);</span>
+<span class="nc" id="L128">        return findPeaks(smoothed, prominence);</span>
+        // double histogramMax = Arrays.stream(smoothed).max().getAsDouble();
+        // return findPeaks(smoothed, prominence * histogramMax);
+    }
+
+    /**
+     * Applies Applies a linear digital filter twice, once forward and once backwards.
+     * The combined filter has zero phase and a filter order twice that of the original.
+     * It handles the signal's edges by padding data with zeros.
+     * @param f the filter
+     * @param xs the data to be filtered
+     * @return the filtered output with the same shape as x.
+     */
+    public static double[] zeroPhaseFilter(double[] f, double[] xs) {
+        // forward filtering
+<span class="fc" id="L143">        double[] forwardFilteredData = convolute(f, xs);</span>
+        // backward filtering on reversed data
+<span class="fc" id="L145">        reverse(forwardFilteredData);</span>
+<span class="fc" id="L146">        double[] backwardFilteredData = convolute(f, forwardFilteredData);</span>
+        // reverse the data back to original order
+<span class="fc" id="L148">        reverse(backwardFilteredData);</span>
+<span class="fc" id="L149">        return backwardFilteredData;</span>
+    }
+
+    /**
+     * Convolutes a kernel to a signal. It handles the signal's edges by padding signal with zeros.
+     *
+     * @param kernel:    kernel to apply
+     * @param signal: signal on which the kernel is applied
+     * @return the filtered signal as a double array
+     */
+    private static double[] convolute(double[] kernel, double[] signal) {
+<span class="fc" id="L160">        int padSize = Math.floorDiv(kernel.length, 2);</span>
+
+<span class="fc" id="L162">        double[] paddedInputData = DoubleStream.concat(</span>
+<span class="fc" id="L163">                DoubleStream.generate(() -&gt; 0).limit(padSize),          // DoubleStream.range(0,padSize).mapToObj(i -&gt; signal[padSize-i]),</span>
+<span class="fc" id="L164">                DoubleStream.concat(</span>
+<span class="fc" id="L165">                        Arrays.stream(signal),</span>
+<span class="fc" id="L166">                        DoubleStream.generate(() -&gt; 0).limit(padSize))  // DoubleStream.range(0,padSize).mapToObj(i -&gt; signal[inputSize-padSize-i]))</span>
+<span class="fc" id="L167">        ).toArray();</span>
+
+<span class="fc" id="L169">        return IntStream.range(kernel.length-1, paddedInputData.length)</span>
+<span class="fc" id="L170">                .mapToDouble(i -&gt; IntStream.range(0, kernel.length)</span>
+<span class="fc" id="L171">                        .mapToDouble(j -&gt; paddedInputData[i-j] * kernel[j])</span>
+<span class="fc" id="L172">                        .sum())</span>
+<span class="fc" id="L173">                .toArray();</span>
+    }
+
+    static void reverse(double[] a) {
+        double temp;
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length / 2; i++) {</span>
+<span class="fc" id="L179">            temp = a[i];</span>
+<span class="fc" id="L180">            a[i] = a[a.length - i - 1];</span>
+<span class="fc" id="L181">            a[a.length - i - 1] = temp;</span>
+        }
+<span class="fc" id="L183">    }</span>
+
+    /**
+     * Finds the local maxima that peak above the nearby data
+     * @param x the data
+     * @param prominence the threshold above which a local maximum is considered a peak
+     * @return the positions of the peaks inside x
+     */
+    public static int[] findPeaks(double[] x, double prominence) {
+<span class="fc" id="L192">        int[] peaks = localMaxima(x);</span>
+<span class="fc" id="L193">        return Arrays.stream(peaks)</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                .filter(peak -&gt; peakProminence(x, peak) &gt;= prominence)</span>
+<span class="fc" id="L195">                .toArray();</span>
+    }
+
+    private static int[] localMaxima(double[] x) {
+<span class="fc" id="L199">        List&lt;Integer&gt; midpoints = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L200">        int i = 1;                      // Pointer to current sample, first one can't be maxima</span>
+<span class="fc" id="L201">        int iMax = x.length - 1;        // Last sample can't be maxima</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        while (i &lt; iMax) {</span>
+            // Test if previous sample is smaller
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (x[i - 1] &lt; x[i]) {</span>
+<span class="fc" id="L205">                int iAhead = i + 1;     // Index to look ahead of current sample</span>
+
+                // Find next sample that is unequal to x[i]
+<span class="fc bfc" id="L208" title="All 4 branches covered.">                while (iAhead &lt; iMax &amp;&amp; x[iAhead] == x[i])</span>
+<span class="fc" id="L209">                    iAhead += 1;</span>
+
+                // Maxima is found if next unequal sample is smaller than x[i]
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                if (x[iAhead] &lt; x[i]) {</span>
+<span class="fc" id="L213">                    midpoints.add((i + iAhead - 1) / 2); // intdiv</span>
+                    // Skip samples that can 't be maximum
+<span class="fc" id="L215">                    i = iAhead;</span>
+                }
+            }
+<span class="fc" id="L218">            i += 1;</span>
+        }
+<span class="fc" id="L220">        return midpoints.stream().mapToInt(n-&gt;n).toArray();</span>
+    }
+
+    private static double peakProminence(double[] x, int peak) {
+        // Find the left base in interval [iMin, peak]
+<span class="fc" id="L225">        double leftMin = IntStream.range(0, peak)</span>
+<span class="fc" id="L226">                .mapToObj(i -&gt; x[peak-i]) // reverse stream</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">                .takeWhile(elem -&gt; elem &lt;= x[peak])</span>
+<span class="fc" id="L228">                .min(Double::compare)</span>
+<span class="fc" id="L229">                .get();</span>
+<span class="fc" id="L230">        double rightMin = Arrays.stream(x, peak, x.length)</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">                .takeWhile(elem -&gt; elem &lt;= x[peak])</span>
+<span class="fc" id="L232">                .min()</span>
+<span class="fc" id="L233">                .getAsDouble();</span>
+
+<span class="fc" id="L235">        return x[peak] - Math.max(leftMin, rightMin);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

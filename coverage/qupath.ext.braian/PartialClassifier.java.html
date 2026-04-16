@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PartialClassifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">qupath-extension-braian</a> &gt; <a href="index.source.html" class="el_package">qupath.ext.braian</a> &gt; <span class="el_source">PartialClassifier.java</span></div><h1>PartialClassifier.java</h1><pre class="source lang-java linenums">// SPDX-FileCopyrightText: 2024 Carlo Castoldi &lt;carlo.castoldi@outlook.com&gt;
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package qupath.ext.braian;
+
+import qupath.lib.classifiers.object.ObjectClassifier;
+import qupath.lib.images.ImageData;
+import qupath.lib.objects.PathAnnotationObject;
+
+import java.util.Collection;
+import java.util.List;
+
+/**
+ * Creates a classifier to apply to an instance of {@link AbstractDetections}
+ * @param classifier an object classifier
+ * @param annotations the annotations to which contained detection solely apply the &lt;code&gt;classifier&lt;/code&gt;.
+ *                    If &lt;code&gt;null&lt;/code&gt;, it applies it to the whole image.
+ * @see AbstractDetections#applyClassifiers(List, ImageData)
+ */
+<span class="nc" id="L21">public record PartialClassifier&lt;T&gt;(ObjectClassifier&lt;T&gt; classifier, Collection&lt;PathAnnotationObject&gt; annotations) {</span>
+    /**
+     * @return true, if the partial classifier covers the whole whole image, thus causing all detections to be classified
+     */
+    public boolean coversFullImage() {
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        return this.annotations == null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
