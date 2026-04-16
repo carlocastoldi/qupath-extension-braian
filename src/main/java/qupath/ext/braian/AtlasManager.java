@@ -82,7 +82,8 @@ public class AtlasManager {
         return hierarchy.getAnnotationObjects()
                 .stream()
                 .filter(o -> "Root".equals(o.getName()) &&
-                            (atlasName == null || (o.getPathClass() != null && o.getPathClass().getName().equals(atlasName)))
+                            ((atlasName == null && o.getPathClass() != EXCLUDE_CLASSIFICATION) ||  // might find a 'Root' exclusion annotation, if it was created with SHIFT+D
+                             (o.getPathClass() != null && o.getPathClass().getName().equals(atlasName)))
                         )
                 .toList();
     }
