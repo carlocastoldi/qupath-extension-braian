@@ -9,7 +9,16 @@ import java.util.List;
 public class ChannelDetectionsConfig {
     private String name;
     private WatershedCellDetectionConfig parameters = new WatershedCellDetectionConfig();
+    private int inputChannelID = 1; // 1-based index
     private List<ChannelClassifierConfig> classifiers = List.of(); // maps classifier name to annotation names
+
+    public int getInputChannelID() {
+        return inputChannelID;
+    }
+
+    public void setInputChannelID(int inputChannelID) {
+        this.inputChannelID = inputChannelID;
+    }
 
     public String getName() {
         return name;
