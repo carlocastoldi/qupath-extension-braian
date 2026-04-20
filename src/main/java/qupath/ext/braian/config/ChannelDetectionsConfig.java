@@ -10,6 +10,7 @@ public class ChannelDetectionsConfig {
     private String name;
     private WatershedCellDetectionConfig parameters = new WatershedCellDetectionConfig();
     private List<ChannelClassifierConfig> classifiers = List.of(); // maps classifier name to annotation names
+    private List<PixelClassifierConfig> pixelClassifiers = List.of();
 
     public String getName() {
         return name;
@@ -37,5 +38,13 @@ public class ChannelDetectionsConfig {
             classifier.setChannel(this.name);
         }
         this.classifiers = classifiers;
+    }
+
+    public List<PixelClassifierConfig> getPixelClassifiers() {
+        return pixelClassifiers;
+    }
+
+    public void setPixelClassifiers(List<PixelClassifierConfig> pixelClassifiers) {
+        this.pixelClassifiers = pixelClassifiers == null ? List.of() : pixelClassifiers;
     }
 }

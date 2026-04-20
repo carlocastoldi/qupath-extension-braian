@@ -30,6 +30,7 @@ dependencies {
     // For testing
     testImplementation(libs.bundles.qupath)
     testImplementation(libs.junit)
+    testImplementation(libs.snakeyaml)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core:5.+")
 }
