@@ -7,6 +7,8 @@ package qupath.ext.braian;
 import org.controlsfx.control.action.Action;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.ext.braian.classifier.BraiAnObjectClassifierCommand;
+import qupath.fx.utils.FXUtils;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.actions.ActionTools;
 import qupath.lib.gui.extensions.QuPathExtension;
@@ -59,9 +61,19 @@ public class BraiAnExtension implements QuPathExtension {
                     QP.selectObjects(regionsToExcludeSet);
                 },
                 "Show regions currently excluded");
+        var braianObjectClassifier = ActionTools.createAction(
+                () -> {
+                    FXUtils.runOnApplicationThread(new BraiAnObjectClassifierCommand(qupath));
+                },
+                "Create detections classifier"
+        );
         MenuTools.addMenuItems(
                 qupath.getMenu(BraiAnExtension.menuPosition, true),
                 showExclusions
+        );
+        MenuTools.addMenuItems(
+                qupath.getMenu(BraiAnExtension.menuPosition, true),
+                braianObjectClassifier
         );
     }
 
