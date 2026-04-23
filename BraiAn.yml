@@ -10,6 +10,8 @@
 # If a value is not defined in the YAML, BraiAn will apply a default value.
 classForDetections: null                  # DEFAULT: null (i.e. applies BraiAn on the whole image)
                                           #               Class of the annotations in which BraiAn's cell detection analysis is desired
+atlasName: "allen_mouse_10um_java"        # DEFAULT: "allen_mouse_10um_java"
+                                          #               ABBA atlas name/identifier to use when importing/working with atlas regions
 detectionsCheck:
   apply: true                             # DEFAULT: false
                                           #               If set to true, each detection on a channel (different from 'controlChannel') is ascribable to a cell detection in the 'controlChannel'.
@@ -23,6 +25,10 @@ detectionsCheck:
 channelDetections:                        # DEFAULT: empty (i.e. BraiAn does not work on any imagge channel)
   # - name: "DAPI"                        # if no parameters are defined for one channel, BraiAn will use QuPath's default values
   - name: "AF568" # cFos
+    inputChannelID: 1                    # DEFAULT: 1 (1-based)
+                                          #               Source channel index to use if channel names are ambiguous
+    enableCellDetection: true            # DEFAULT: true
+                                          #               If false, skip cell detection for this channel
     parameters:
       requestedPixelSizeMicrons: 1        # DEFAULT: 0.5
                                           #               Choose pixel size at which detection will be performed - higher values are likely to be faster, but may be less accurate;
@@ -78,6 +84,8 @@ channelDetections:                        # DEFAULT: empty (i.e. BraiAn does not
         annotationsToClassify:            # DEFAULT: empty (i.e. the classifier is applied on all detections)
                                           #               List of the annotation names for which the classifier is applied
   - name: "AF647" # Arc1
+    inputChannelID: 1
+    enableCellDetection: true
     parameters:
       requestedPixelSizeMicrons: 1
       # Nucleus parameters

@@ -52,6 +52,13 @@ public class ProjectsConfig {
     }
 
     private String classForDetections = null;
+
+    /**
+     * Name of the ABBA atlas to use when importing/working with atlas regions.
+     * <p>
+     * This should match the atlas identifier configured in the ABBA extension.
+     */
+    private String atlasName = "allen_mouse_10um_java";
     private DetectionsCheckConfig detectionsCheck = new DetectionsCheckConfig();
     private List<ChannelDetectionsConfig> channelDetections = List.of();
 
@@ -80,6 +87,14 @@ public class ProjectsConfig {
 
     public void setClassForDetections(String classForDetections) {
         this.classForDetections = classForDetections;
+    }
+
+    public String getAtlasName() {
+        return atlasName;
+    }
+
+    public void setAtlasName(String atlasName) {
+        this.atlasName = atlasName;
     }
 
     public DetectionsCheckConfig getDetectionsCheck() {

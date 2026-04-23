@@ -9,7 +9,26 @@ import java.util.List;
 public class ChannelDetectionsConfig {
     private String name;
     private WatershedCellDetectionConfig parameters = new WatershedCellDetectionConfig();
+
+    /**
+     * 1-based input channel index to use when the display name does not uniquely identify the source.
+     */
+    private int inputChannelID = 1;
+
+    /**
+     * Whether cell detection should run for this channel.
+     */
+    private boolean enableCellDetection = true;
+
     private List<ChannelClassifierConfig> classifiers = List.of(); // maps classifier name to annotation names
+
+    public int getInputChannelID() {
+        return inputChannelID;
+    }
+
+    public void setInputChannelID(int inputChannelID) {
+        this.inputChannelID = inputChannelID;
+    }
 
     public String getName() {
         return name;
@@ -37,5 +56,13 @@ public class ChannelDetectionsConfig {
             classifier.setChannel(this.name);
         }
         this.classifiers = classifiers;
+    }
+
+    public boolean isEnableCellDetection() {
+        return enableCellDetection;
+    }
+
+    public void setEnableCellDetection(boolean enableCellDetection) {
+        this.enableCellDetection = enableCellDetection;
     }
 }
