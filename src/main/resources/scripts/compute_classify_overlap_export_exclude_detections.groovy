@@ -48,8 +48,8 @@ var allDetections = config.channelDetections.collect { detectionsConf ->
 // RETRIEVE PRE-COMPUTED CHANNEL DETECTIONS
 // var allDetections = config.channelDetections.collect { detectionsConf -> new ChannelDetections(detectionsConf.name, hierarchy) }
 
-if (allDetections.isEmpty()) {
-    println getCurrentImageName()+" : DONE! No annotations found to compute on"
+if (allDetections.isEmpty() || allDetections.every {it.getContainers().isEmpty()} ) {
+    getLogger().warn("No annotations found to work on: "+getCurrentImageName())
     return
 }
 
