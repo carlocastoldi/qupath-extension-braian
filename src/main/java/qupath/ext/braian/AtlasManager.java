@@ -60,7 +60,7 @@ public class AtlasManager {
 
     /**
      * Checks whether at least one ABBA atlas was previously imported.
-     * @param hierarchy where to search for the atlas
+     * @param hierarchy where to search for the atlas.
      * @return true if an ABBA atlas was previously imported
      */
     public static boolean isImported(PathObjectHierarchy hierarchy) {
@@ -71,7 +71,7 @@ public class AtlasManager {
      * Checks whether a specific ABBA atlas was previously imported.
      * @param atlasName the name of the atlas to check.
      *                  If null, it checks whether <i>any</i> atlas was imported with ABBA
-     * @param hierarchy where to search for the atlas
+     * @param hierarchy where to search for the atlas.
      * @return true if the atlas was previously imported
      */
     public static boolean isImported(String atlasName, PathObjectHierarchy hierarchy) {
@@ -116,6 +116,26 @@ public class AtlasManager {
         return hierarchy.getAnnotationObjects().stream()
                 .filter( ann -> ann.getPathClass() == AtlasManager.EXCLUDE_CLASSIFICATION )
                 .toList();
+    }
+
+    /**
+     * Gets all annotations, classified as "Exclude", that are covered by another exclusion annotation,
+     * thus making them redundant.
+     * @param hierarchy where to search for redundant exclusions.
+     * @return the set of redundant exclusion annotations. Only those in the first layer of the hierarchy are given.
+     * @see #getExcludedBrainRegions()
+     * @see #saveExcludedRegions(File)
+     */
+    public static Set<PathObject> redundantExclusions(PathObjectHierarchy hierarchy) {
+        List<PathObject> excludeAnnotations = AtlasManager.getExclusionAnnotations(hierarchy).stream()
+                .filter(exc -> exc.getParent() == hierarchy.getRootObject())
+                .toList();
+        return excludeAnnotations.stream()
+                .filter(exclusion1 -> excludeAnnotations.stream()
+                    .anyMatch(exclusion2 -> exclusion1 != exclusion2 &&
+                        exclusion1.getROI().getGeometry().coveredBy(exclusion2.getROI().getGeometry())
+                    )
+                ).collect(Collectors.toSet());
     }
 
     private final PathObject atlasObject;
