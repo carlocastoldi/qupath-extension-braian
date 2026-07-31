@@ -15,7 +15,7 @@ plugins {
 qupathExtension {
     name = "qupath-extension-braian"
     group = "fr.cnrs.ipmc.silvalab"
-    version = "1.1.1-SNAPSHOT"
+    version = "1.1.1"
     description = "QuPath extension for whole-brain data extraction"
     automaticModule = "qupath.extension.braian"
 }
